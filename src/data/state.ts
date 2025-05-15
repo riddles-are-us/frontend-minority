@@ -4,15 +4,18 @@ import { createStateSlice, PropertiesState, ConnectState } from "zkwasm-miniroll
 export interface PlayerInfo {
   nonce: number;
   data: {
-    balance: number;
-    inventory_size: number;
-    inventory: number[];
+      balance: number;
+      round: number;
+      rounds: number[];
+      purchase: number[]
   };
 }
 
 export interface GlobalState {
-  total: number;
-  counter: number;
+    round: number;
+    counter: number;
+    pool: number;
+    cards: number[];
 }
 
 export interface Bid {

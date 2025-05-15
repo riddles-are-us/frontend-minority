@@ -1,72 +1,39 @@
-import { selectUserState, Nugget } from '../data/state';
-import { MDBContainer, MDBRow, MDBCol, MDBCard, MDBCardBody, MDBCardHeader, MDBTable, MDBTableBody, MDBTableHead, MDBBtn } from 'mdb-react-ui-kit';
-import { setFocus } from '../data/ui';
+import React, {useRef, useEffect, useState } from 'react';
+import { createCommand } from "zkwasm-minirollup-rpc";
+import { MDBCard, MDBCardBody, MDBCardHeader, MDBBtn } from 'mdb-react-ui-kit';
+import { sendTransaction } from '../request';
 import { useAppSelector, useAppDispatch } from "../app/hooks";
+import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
+import { selectUserState } from '../data/state';
 
+const INSTALL_PLAYER = 1n;
+const WITHDRAW = 2n;
+const DEPOSIT = 3n;
+const BUY_CARD = 4n;
+const CLAIM_REWARD = 5n;
 
-function decodeAttributes(attrStr: string) {
-  let c = BigInt(attrStr);
-  let attrs = []
-  for (let i=0;i<8;i++) {
-    attrs.push(Number(c & 0xffn));
-    c >>= 8n;
-  }
-  return attrs;
-}
-
-function Attributes(params: {attrs: string, nbplus: number}) {
-  const attrs = decodeAttributes(params.attrs);
-  const stuff = [];
-  if (params.nbplus > 0) {
-    stuff.push(<span>(</span>);
-  }
-  for (let i=0; i<params.nbplus; i++) {
-    let symbol = attrs[i] == 0? "?": attrs[i].toString()
-    stuff.push(<span>{symbol}</span>);
-    if (i<params.nbplus-1) {
-      stuff.push(<span>+</span>);
+export function NuggetCard(params: {index: number, amount: number}) {
+  const dispatch = useAppDispatch();
+  const userState = useAppSelector(selectUserState);
+  const l2account = useAppSelector(AccountSlice.selectL2Account);
+  const buyCard= (index: bigint, amount: bigint) => {
+    if(userState!.player) {
+        const command = createCommand(BigInt(userState!.player!.nonce), BUY_CARD, [index, amount]);
+        dispatch(sendTransaction({cmd: command,prikey: l2account!.getPrivateKey()}));
     }
   }
-  if (params.nbplus > 0) {
-    stuff.push(<span>)</span>);
-  }
-  for (let i=params.nbplus; i<8; i++) {
-    let symbol = attrs[i] == 0? "?": attrs[i].toString()
-    stuff.push(<span>*{symbol}</span>);
-  }
-  return (
-  <>
-  {
-    stuff.map((att) => {
-      return att
-    })
-  }
-  </>);
-}
 
-export function NuggetCard(params: {nugget: Nugget, index?: number}) {
-  const dispatch = useAppDispatch();
 
-  function setFocusNugget(nugget: Nugget, index: number | null = null) {
-    dispatch(setFocus({
-      nugget: nugget,
-      index: index 
-    }));
-  }
-
-  return <MDBCard>
+  return (<MDBCard>
     <MDBCardHeader>
       <div className="d-flex">
-        <h5>NuggetID: {params.nugget.id} </h5>
+        <h5>NuggetID: {params.index} </h5>
       </div>
     </MDBCardHeader>
     <MDBCardBody>
-      <p>Recycle Price: {params.nugget.sysprice}</p>
-      <p><Attributes attrs={params.nugget.attributes} nbplus={params.nugget.feature}/></p>
-      <p>cycle: {params.nugget.cycle}</p>
-      <p>feature: {params.nugget.feature}</p>
-      <p>Bid: {params.nugget.bid ? params.nugget.bid?.bidprice : "NA"}</p>
-      <MDBBtn onClick={()=>setFocusNugget(params.nugget, params.index)}>more</MDBBtn>
+      <p>holder: {params.amount}</p>
+      <MDBBtn onClick={()=>buyCard(BigInt(params.index), 1n)}>buy</MDBBtn>
     </MDBCardBody>
   </MDBCard>
+  )
 }

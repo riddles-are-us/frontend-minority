@@ -55,21 +55,6 @@ export const getConfig = createAsyncThunk(
 
 export const SERVER_TICK_TO_SECOND = 5;
 
-interface UserState<P, S> {
-  player: P | null,
-  state: S,
-}
-
-interface SendTransactionParams {
-    cmd: Array<bigint>;
-    prikey: string;
-}
-
-interface QueryStateParams {
-    prikey: string;
-}
-
-
 export const sendTransaction = createAsyncThunk(
   'client/sendTransaction',
   async (params: {cmd: BigUint64Array, prikey: string }, { rejectWithValue }) => {

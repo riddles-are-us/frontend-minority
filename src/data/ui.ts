@@ -26,50 +26,15 @@ async function queryData(url: string) {
   }
 }
 
-async function queryBidsI(key: string) {
-  const pubkey = new LeHexBN(query(key).pkx).toU64Array();
-  return await queryData(`bid/${pubkey[1]}/${pubkey[2]}`);
+async function queryRound(index: number) {
+  return await queryData(`/round/${index}`);
 }
 
-async function queryNuggetsI(page: number) {
-  return await queryData(`nuggets`);
-}
-
-async function queryNuggetI(nuggetId: number) {
-  return await queryData(`nugget/${nuggetId}`);
-}
-
-export const getBids = createAsyncThunk(
-  'client/getBids',
-  async (key: string, { rejectWithValue }) => {
-    try {
-      const res: any = await queryBidsI(key);
-      return res;
-    } catch (err: any) {
-      return rejectWithValue(err);
-    }
-  }
-)
-
-
-
-export const getNuggets = createAsyncThunk(
+export const getRounds = createAsyncThunk(
   'client/getNuggets',
   async (page: number, { rejectWithValue }) => {
     try {
-      const res: any = await queryNuggetsI(page);
-      return res;
-    } catch (err: any) {
-      return rejectWithValue(err);
-    }
-  }
-)
-
-export const getNugget = createAsyncThunk(
-  'client/getNugget',
-  async (params: {index: number, nuggetId: number}, { rejectWithValue }) => {
-    try {
-      const res: any = await queryNuggetI(params.nuggetId);
+      const res: any = await queryRound(page);
       return res;
     } catch (err: any) {
       return rejectWithValue(err);
@@ -137,29 +102,10 @@ const uiSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
-      .addCase(getNuggets.fulfilled, (state, action) => {
-        state.nuggets.nuggets = action.payload;
+      .addCase(getRounds.fulfilled, (state, action) => {
+        //state.nuggets.bids = action.payload;
       })
-      .addCase(getNuggets.rejected, (state, action) => {
-        state.lastError = {
-          errorInfo:`send transaction rejected: ${action.payload}`,
-          payload: action.payload,
-        }
-      })
-      .addCase(getNugget.fulfilled, (state, action) => {
-        const nugget = action.payload[0];
-        state.nuggets.inventory[action.meta.arg.index] = nugget;
-      })
-      .addCase(getNugget.rejected, (state, action) => {
-        state.lastError = {
-          errorInfo:`send transaction rejected: ${action.payload}`,
-          payload: action.payload,
-        }
-      })
-      .addCase(getBids.fulfilled, (state, action) => {
-        state.nuggets.bids = action.payload;
-      })
-      .addCase(getBids.rejected, (state, action) => {
+      .addCase(getRounds.rejected, (state, action) => {
         state.lastError = {
           errorInfo:`send transaction rejected: ${action.payload}`,
           payload: action.payload,
@@ -168,7 +114,6 @@ const uiSlice = createSlice({
   }
 });
 
-export const selectNuggets = (state: RootState) => state.extra.nuggets;
 export const selectUIState = (state: RootState) => state.extra.uiState;
 export const selectUIResponse = (state: RootState) => state.extra.lastResponse;
 export const { setUIState, setUIResponse, setFocus } = uiSlice.actions;

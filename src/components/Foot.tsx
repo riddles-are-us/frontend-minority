@@ -6,7 +6,6 @@ export default function Footer() {
     <MDBFooter bgColor='light' className='text-center text-lg-start text-muted'>
       <section className='p-1 border-bottom mt-5'>
       </section>
-
       <section className='mt-2'>
         <MDBContainer className='text-center text-md-start mt-5'>
           <MDBRow className='mt-3'>

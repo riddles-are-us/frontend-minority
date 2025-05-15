@@ -3,23 +3,17 @@ import React, { useRef, useEffect, useState } from "react";
 import 'mdb-react-ui-kit/dist/css/mdb.min.css';
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./style.scss";
-import {
-  MDBModal,
-} from 'mdb-react-ui-kit';
 import { selectConnectState, selectUserState, selectLastError } from "../data/state";
 import { setUIState, ModalIndicator, selectUIState } from "../data/ui";
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
 import { queryInitialState, queryState, sendTransaction } from "../request";
 import { createCommand } from "zkwasm-minirollup-rpc";
-import { getNuggets }  from "../data/ui";
 import { MarketPage } from "../components/MarketPage";
 import { User } from "../components/User";
-import Footer from "../components/Foot";
 import Nav from "../components/Nav";
-import NuggetModal from "../components/NuggetModal";
 import ErrorModal from "../components/ErrorModal";
-import {WithdrawModal} from "../components/Common";
+import { HistoryPage } from "../components/History";
 import {
     MDBBtn,
     MDBContainer,
@@ -52,7 +46,6 @@ export function Main() {
     } else {
       dispatch(queryInitialState("1"));
     }
-    dispatch(getNuggets(0))
   }, [l2account]);
 
   useEffect(() => {
@@ -72,15 +65,23 @@ export function Main() {
       {userState?.player &&
       <User/>
       }
-      <MarketPage />
-      </MDBContainer>
-      {userState?.player && lastError == null &&
-      <NuggetModal/>
+      {userState?.player &&
+      <HistoryPage/>
       }
+      {userState?.state &&
+        <>
+        <p> Current Round {userState?.state.round} </p>
+        <p> Time left {userState?.state.counter * 5} </p>
+        </>
+      } 
+
+      {userState?.state &&
+      <MarketPage />
+      }
+      </MDBContainer>
       {lastError &&
       <ErrorModal/>
       }
-      <Footer />
     </>
   );
 }
