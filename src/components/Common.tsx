@@ -3,14 +3,75 @@ import ReactDOM from "react-dom";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { sendTransaction } from "../request";
 import { AccountSlice } from "zkwasm-minirollup-browser";
-import { Alert, Modal, Button, InputGroup, Form, Spinner } from "react-bootstrap";
+import { Alert, Modal, Button, InputGroup, Form, Spinner, ButtonProps } from "react-bootstrap";
 import {PlayerInfo, selectUserState} from "../data/state";
 import {createWithdrawCommand} from "zkwasm-minirollup-rpc";
 import {ModalIndicator, selectUIResponse, selectUIState, setUIResponse, setUIState} from "../data/ui";
+import styled from 'styled-components';
+import Loader from './Loader';
 
 
 const CMD_WITHDRAW = 8n;
 
+const StyledModal = styled.div`
+  margin: 20px 40px 20px 20px;
+  
+  .modal-header {
+    border-bottom: 1px solid ${props => props.theme.primaryLight};
+  }
+  
+  .modal-title {
+    color: ${props => props.theme.primary};
+    font-weight: 600;
+  }
+  
+  .alert {
+    background-color: ${props => props.theme.bgSecondary};
+    border: 1px solid ${props => props.theme.primaryLight};
+    color: ${props => props.theme.textSecondary};
+  }
+  
+  .alert-danger {
+    background-color: ${props => props.theme.error}20;
+    border-color: ${props => props.theme.error};
+    color: ${props => props.theme.error};
+  }
+  
+  p {
+    color: ${props => props.theme.textSecondary};
+  }
+  
+  /* Added styles for custom button */
+  /* Using CSS classes instead of styled-components for the button to avoid TypeScript's "complex union type" error */
+  .theme-button {
+    background-color: ${props => props.theme.primary};
+    border-color: ${props => props.theme.primaryDark};
+    color: white;
+  }
+  
+  .theme-button:hover:not(:disabled) {
+    background-color: ${props => props.theme.primaryLight};
+    border-color: ${props => props.theme.primary};
+  }
+  
+  .theme-button:active:not(:disabled) {
+    background-color: ${props => props.theme.primaryDark} !important;
+    border-color: ${props => props.theme.primaryDark} !important;
+  }
+  
+  .loader-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 15px 0;
+  }
+  
+  .success-message {
+    margin-left: 15px;
+    color: ${props => props.theme.success};
+    font-weight: 500;
+  }
+`;
 
 interface Props {
   handleClose: () => void;
@@ -56,6 +117,7 @@ export const WithdrawModal = ({
   const [amount, setAmount] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
+  const [transactionComplete, setTransactionComplete] = useState(false);
 
 
   const handleResult = (msg: string) => {
@@ -75,11 +137,15 @@ export const WithdrawModal = ({
       })
     ).then((action) => {
       if (sendTransaction.fulfilled.match(action)) {
-        handleResult("Withdraw successed");
-        setIsExecuting(false);
-        setErrorMessage("");
+        setTransactionComplete(true);
+        setTimeout(() => {
+          handleResult("Withdraw successful");
+          setIsExecuting(false);
+          setErrorMessage("");
+          setTransactionComplete(false);
+        }, 2000);
       } else if(sendTransaction.rejected.match(action)) {
-        setErrorMessage("Withdraw Error: " +  action.payload);
+        setErrorMessage("Withdraw Error: " + action.payload);
         setIsExecuting(false);
       }
     })
@@ -95,8 +161,12 @@ export const WithdrawModal = ({
       })
     ).then((action) => {
       if (AccountSlice.depositAsync.fulfilled.match(action)) {
-        setIsExecuting(false);
-        handleResult("Deposit Success: " +  action.payload!.hash);
+        setTransactionComplete(true);
+        setTimeout(() => {
+          setIsExecuting(false);
+          handleResult("Deposit Success: " + action.payload!.hash);
+          setTransactionComplete(false);
+        }, 2000);
       } else if (AccountSlice.depositAsync.rejected.match(action)) {
         if (action.error.message == null) {
           setErrorMessage("Deposit Failed: Unknown Error");
@@ -149,14 +219,14 @@ export const WithdrawModal = ({
     <>
     {uiState.modal == ModalIndicator.RESPONSE &&
       ReactDOM.createPortal(
-      (<div style={{margin: "20px 40px 20px 20px"}}>
+      (<StyledModal>
           {lastResponse}
-      </div>),
+      </StyledModal>),
       lpanel
     )}
     {(uiState.modal == ModalIndicator.WITHDRAW || uiState.modal == ModalIndicator.DEPOSIT) &&
       ReactDOM.createPortal(
-      (<div style={{margin: "20px 40px 20px 20px"}}>
+      (<StyledModal>
         <Modal.Header>
           <Modal.Title>{uiState.modal == ModalIndicator.WITHDRAW ? "Withdraw" : "Deposit"}</Modal.Title>
         </Modal.Header>
@@ -165,12 +235,12 @@ export const WithdrawModal = ({
           <Alert>Token contract {tokenAddr}</Alert>
 
           {uiState.modal == ModalIndicator.DEPOSIT &&
-          <p> Please provide the amout you want to deposit:
+          <p> Please provide the amount you want to deposit:
             (there will be a small delay for the game server to notice your deposit)
           </p>
           }
           {uiState.modal == ModalIndicator.WITHDRAW &&
-          <p> Please provide the amout you want to withdraw:
+          <p> Please provide the amount you want to withdraw:
             (there will be a small delay for the withdraw to be settled through the game contract)
           </p>
           }
@@ -182,16 +252,34 @@ export const WithdrawModal = ({
               onChange={(e) => setAmount(e.target.value)}
               min="0"
               required
+              disabled={isExecuting}
             />
           </InputGroup>
+          
+          {isExecuting && (
+            <div className="loader-container">
+              <Loader />
+              {transactionComplete && 
+                <span className="success-message">
+                  {uiState.modal == ModalIndicator.WITHDRAW ? "Withdrawal Complete!" : "Deposit Complete!"}
+                </span>
+              }
+            </div>
+          )}
+          
           {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="primary" onClick={onConfirm} disabled={isExecuting}>
-            {isExecuting ? <Spinner animation="border" size="sm" /> : "Confirm"}
+          <Button 
+            variant="primary" 
+            onClick={onConfirm} 
+            disabled={isExecuting}
+            className="theme-button"
+          >
+            {isExecuting ? 'Processing...' : 'Confirm'}
           </Button>
         </Modal.Footer>
-      </div>),
+      </StyledModal>),
       lpanel
     )}
     </>

@@ -18,7 +18,26 @@ import {
     MDBBtn,
     MDBContainer,
 } from 'mdb-react-ui-kit';
+import styled from 'styled-components';
 
+const StyledContainer = styled(MDBContainer)`
+  background-color: ${props => props.theme.bgSecondary};
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem !important;
+`;
+
+const InfoText = styled.p`
+  color: ${props => props.theme.textSecondary};
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  
+  span {
+    font-weight: bold;
+    color: ${props => props.theme.primary};
+  }
+`;
 
 const REGISTER_PLAYER = 1n;
 
@@ -61,7 +80,7 @@ export function Main() {
   return (
     <>
       <Nav />
-      <MDBContainer className="mt-5">
+      <StyledContainer>
       {userState?.player &&
       <User/>
       }
@@ -70,15 +89,15 @@ export function Main() {
       }
       {userState?.state &&
         <>
-        <p> Current Round {userState?.state.round} </p>
-        <p> Time left {userState?.state.counter * 5} </p>
+        <InfoText>Current Round <span>{userState?.state.round}</span></InfoText>
+        <InfoText>Time left <span>{userState?.state.counter * 5}</span></InfoText>
         </>
       } 
 
       {userState?.state &&
       <MarketPage />
       }
-      </MDBContainer>
+      </StyledContainer>
       {lastError &&
       <ErrorModal/>
       }

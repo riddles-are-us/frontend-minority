@@ -5,6 +5,67 @@ import { sendTransaction } from '../request';
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
 import { selectUserState } from '../data/state';
+import styled from 'styled-components';
+import Loader from './Loader';
+
+const StyledCard = styled(MDBCard)`
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const StyledCardHeader = styled(MDBCardHeader)`
+  background-color: ${props => props.theme.primary};
+  color: ${props => props.theme.textLight};
+  border-bottom: none;
+  
+  h5 {
+    margin: 0;
+    font-weight: 600;
+  }
+`;
+
+const StyledCardBody = styled(MDBCardBody)`
+  background-color: ${props => props.theme.bgSecondary};
+  
+  p {
+    color: ${props => props.theme.textSecondary};
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+  
+  .loader-container {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+  }
+`;
+
+// Define type for button props
+interface StyledButtonProps {
+  onClick?: () => void;
+  children: React.ReactNode;
+}
+
+const StyledButton = styled(MDBBtn)<StyledButtonProps>`
+  background-color: ${props => props.theme.secondary} !important;
+  color: ${props => props.theme.textPrimary} !important;
+  
+  &:hover {
+    background-color: ${props => props.theme.secondaryLight} !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  &:active {
+    background-color: ${props => props.theme.secondaryDark} !important;
+  }
+`;
 
 const INSTALL_PLAYER = 1n;
 const WITHDRAW = 2n;
@@ -16,24 +77,53 @@ export function NuggetCard(params: {index: number, amount: number}) {
   const dispatch = useAppDispatch();
   const userState = useAppSelector(selectUserState);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
-  const buyCard= (index: bigint, amount: bigint) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionComplete, setTransactionComplete] = useState(false);
+  
+  const buyCard = (index: bigint, amount: bigint) => {
     if(userState!.player) {
+        setIsLoading(true);
         const command = createCommand(BigInt(userState!.player!.nonce), BUY_CARD, [index, amount]);
-        dispatch(sendTransaction({cmd: command,prikey: l2account!.getPrivateKey()}));
+        dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
+          .then((action) => {
+            if (sendTransaction.fulfilled.match(action)) {
+              setTransactionComplete(true);
+              // After 2 seconds, hide the loader and reset state
+              setTimeout(() => {
+                setIsLoading(false);
+                setTransactionComplete(false);
+              }, 2000);
+            } else {
+              setIsLoading(false);
+            }
+          });
     }
   }
 
-
-  return (<MDBCard>
-    <MDBCardHeader>
-      <div className="d-flex">
-        <h5>NuggetID: {params.index} </h5>
-      </div>
-    </MDBCardHeader>
-    <MDBCardBody>
-      <p>holder: {params.amount}</p>
-      <MDBBtn onClick={()=>buyCard(BigInt(params.index), 1n)}>buy</MDBBtn>
-    </MDBCardBody>
-  </MDBCard>
+  return (
+    <StyledCard>
+      <StyledCardHeader>
+        <div className="d-flex">
+          <h5>NuggetID: {params.index}</h5>
+        </div>
+      </StyledCardHeader>
+      <StyledCardBody>
+        <p>Holder: {params.amount}</p>
+        
+        {isLoading && (
+          <div className="loader-container">
+            <Loader />
+            {transactionComplete && <span style={{marginLeft: '10px'}}>Transaction Complete!</span>}
+          </div>
+        )}
+        
+        <StyledButton 
+          onClick={() => buyCard(BigInt(params.index), 1n)} 
+          disabled={isLoading}
+        >
+          {isLoading ? 'Processing...' : 'Buy'}
+        </StyledButton>
+      </StyledCardBody>
+    </StyledCard>
   )
 }

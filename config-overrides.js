@@ -23,7 +23,8 @@ module.exports = function override(config, env) {
       new webpack.ProvidePlugin({
           process: 'process/browser',
           Buffer: ['buffer', 'Buffer']
-      })
+      }),
+      new webpack.HotModuleReplacementPlugin()
   ])
 
   /*
@@ -34,7 +35,17 @@ module.exports = function override(config, env) {
   ])
   */
 
-
+  if (env === 'development') {
+    config.devServer = {
+      ...config.devServer,
+      hot: true,
+      watchOptions: {
+        poll: 1000,
+        aggregateTimeout: 300,
+        ignored: /node_modules/
+      }
+    };
+  }
 
   config.module.rules.forEach(rule => {
     (rule.oneOf || []).forEach(oneOf => {

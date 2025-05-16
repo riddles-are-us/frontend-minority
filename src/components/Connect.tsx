@@ -6,9 +6,29 @@ import {
     MDBBtn,
 } from 'mdb-react-ui-kit';
 import { addressAbbreviation } from "../utils/address";
+import styled from 'styled-components';
+
 interface IProps {
   handleRestart: () => void;
 }
+
+// Define type for button props
+interface StyledButtonProps {
+  onClick?: () => void;
+  children: React.ReactNode;
+}
+
+const StyledMDBBtn = styled(MDBBtn)<StyledButtonProps>`
+  background-color: ${props => props.theme.primary} !important;
+  color: white !important;
+  &:hover {
+    background-color: ${props => props.theme.primaryLight} !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+  }
+  &:active {
+    background-color: ${props => props.theme.primaryDark} !important;
+  }
+`;
 
 export function ConnectButton(props: IProps) {
   const dispatch = useAppDispatch();
@@ -20,7 +40,7 @@ export function ConnectButton(props: IProps) {
     return <span>{addressAbbreviation(l1account!.address, 5)}</span>
   } else {
     return (
-        <MDBBtn onClick={connect}>connect </MDBBtn>
+        <StyledMDBBtn onClick={connect}>connect</StyledMDBBtn>
     );
   }
 }
@@ -40,7 +60,7 @@ export function LoginButton(props: IProps) {
       const l2addresshex = "0x" + l2account.pubkey;
       return <span>ID: {addressAbbreviation(l2addresshex, 5)}</span>
     } else {
-      return <MDBBtn onClick={login}>login apps</MDBBtn>
+      return <StyledMDBBtn onClick={login}>login apps</StyledMDBBtn>
     }
   } else {
     return <></>

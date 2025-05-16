@@ -21,13 +21,13 @@
     "react-redux": "^8.0.5",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
-    "styled-components": "^6.1.14",
+    "styled-components": "^6.1.18",
     "zkwasm-minirollup-browser": "github:DelphinusLab/zkWasm-minirollup-browser",
     "zkwasm-minirollup-rpc": "github:DelphinusLab/zkWasm-minirollup-rpc",
     "zkwasm-service-helper": "github:DelphinusLab/zkWasm-service-helper"
   },
   "scripts": {
-    "start": "npx react-app-rewired start",
+    "start": "PORT=3001 FAST_REFRESH=true CHOKIDAR_USEPOLLING=true npx react-app-rewired start",
     "build": "npx react-app-rewired build",
     "test": "npx react-app-rewired test",
     "eject": "npx react-app-rewired eject",
