@@ -88,34 +88,92 @@ const CoinContainer = styled.div`
 `;
 
 const RewardCard = styled(MDBCard)`
-  border-radius: 8px;
+  position: relative;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 10px;
+    padding: 2px;
+    background: linear-gradient(135deg, #ffd700, #f5a623, #ffcc33, #ffd700);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    z-index: -1;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.2);
+  }
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 10px;
+    background: ${props => props.theme.bgSecondary};
+    z-index: -2;
+  }
   
   &:hover {
-    transform: translateY(-5px);
+    transform: translateY(-6px);
+    box-shadow: 0 12px 20px rgba(255, 193, 7, 0.2);
+    
+    &::before {
+      background: linear-gradient(135deg, #ffd700, #FFA500, #ffcc33, #ffd700);
+      box-shadow: 0 4px 20px rgba(255, 193, 7, 0.4);
+      animation: borderRotate 2s linear infinite;
+    }
+  }
+  
+  @keyframes borderRotate {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
   }
 `;
 
 const RewardCardBody = styled(MDBCardBody)`
-  background-color: ${props => props.theme.bgSecondary};
-  padding: 1.25rem;
+  background-color: transparent;
+  padding: 1.5rem;
+  position: relative;
+  z-index: 2;
   
   p {
     color: ${props => props.theme.textSecondary};
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     font-size: 1.1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     
     span {
       color: ${props => props.theme.primary};
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
   }
   
   .loader-container {
     display: flex;
     justify-content: center;
+    align-items: center;
     margin: 10px 0;
   }
 `;
@@ -128,17 +186,30 @@ interface StyledButtonProps {
 }
 
 const StyledButton = styled(MDBBtn)<StyledButtonProps>`
-  background-color: ${props => props.theme.secondary} !important;
+  background: linear-gradient(to bottom, ${props => props.theme.secondary}, ${props => props.theme.secondaryDark}) !important;
   color: ${props => props.theme.textPrimary} !important;
   margin-top: 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  transition: all 0.3s ease;
+  width: 100%;
   
-  &:hover {
-    background-color: ${props => props.theme.secondaryLight} !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  &:hover:not(:disabled) {
+    background: linear-gradient(to bottom, ${props => props.theme.secondaryLight}, ${props => props.theme.secondary}) !important;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3) !important;
+    transform: translateY(-2px);
   }
   
-  &:active {
-    background-color: ${props => props.theme.secondaryDark} !important;
+  &:active:not(:disabled) {
+    background: linear-gradient(to bottom, ${props => props.theme.secondaryDark}, ${props => props.theme.secondary}) !important;
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 `;
 
@@ -230,13 +301,33 @@ export const HistoryPage = () => {
                 <MDBCol md="3" className="mt-4" key={round.round}>
                   <RewardCard>
                     <RewardCardBody>
-                      <p>Round: <span>{round.round}</span></p>
-                      <p>Share: <span>{round.ratio}</span></p>
+                      <p>Round <span>{round.round}</span></p>
+                      <p>Share <span>{round.ratio}</span></p>
                       
                       {isLoading && (
                         <div className="loader-container">
                           <Loader />
-                          {isCompleted && <span style={{marginLeft: '10px'}}>Claimed!</span>}
+                          {isCompleted && <span style={{
+                            marginLeft: '10px', 
+                            color: '#8BC34A', 
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '20px',
+                              height: '20px',
+                              backgroundColor: '#8BC34A',
+                              borderRadius: '50%',
+                              color: 'white',
+                              fontSize: '14px',
+                              marginRight: '6px'
+                            }}>✓</span>
+                            Claimed!
+                          </span>}
                         </div>
                       )}
                       
@@ -244,7 +335,7 @@ export const HistoryPage = () => {
                         onClick={() => claimReward(BigInt(round.round))}
                         disabled={isLoading}
                       >
-                        {isLoading ? 'Processing...' : 'Claim Reward'}
+                        {isLoading ? 'Processing...' : 'CLAIM REWARD'}
                       </StyledButton>
                     </RewardCardBody>
                   </RewardCard>
