@@ -4,6 +4,7 @@ import { selectUserState, Nugget } from '../data/state';
 import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { NuggetCard } from "../components/NuggetCard";
+import ChartPage from "../components/Chart";
 import "./style.scss";
 
 
@@ -29,6 +30,8 @@ export const MarketPage = () => {
           })
       }
       </MDBRow>
+      {userState?.state && <ChartPage></ChartPage>
+      }
     </>
   );
 };
