@@ -1,49 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAppSelector, useAppDispatch } from './app/hooks';
 import { AccountSlice } from 'zkwasm-minirollup-browser';
 import { ConnectButton, LoginButton } from './components/Connect';
 
 const Card = () => {
+  // 存储每张卡片当前显示的字母
+  const [letters, setLetters] = useState(Array(10).fill('A'));
+  
+  // 生成一个随机字母 (A-Z)
+  const getRandomLetter = () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return alphabet[Math.floor(Math.random() * alphabet.length)];
+  };
+  
+  // 定时更新字母
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setLetters(prevLetters => {
+        // 为每张卡片生成新的随机字母
+        return prevLetters.map(() => getRandomLetter());
+      });
+    }, 1000); // 每秒更新一次
+    
+    // 清理定时器
+    return () => clearInterval(intervalId);
+  }, []);
+  
   return (
     <StyledWrapper>
       <div className="wrapper">
         <div className="inner" style={{"--quantity": 10} as any}>
-          <div className="card" style={{"--index": 0, "--colorCard": '142, 249, 252'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 1, "--colorCard": '142, 252, 204'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 2, "--colorCard": '142, 252, 157'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 3, "--colorCard": '215, 252, 142'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 4, "--colorCard": '252, 252, 142'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 5, "--colorCard": '252, 208, 142'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 6, "--colorCard": '252, 142, 142'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 7, "--colorCard": '252, 142, 239'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 8, "--colorCard": '204, 142, 252'} as any}>
-            <div className="img" />
-          </div>
-          <div className="card" style={{"--index": 9, "--colorCard": '142, 202, 252'} as any}>
-            <div className="img" />
-          </div>
+          {[...Array(10)].map((_, index) => (
+            <div className="card" key={index} style={{"--index": index, "--colorCard": getCardColor(index)} as any}>
+              <div className="img">
+                <span className="card-letter">{letters[index]}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </StyledWrapper>
   );
 }
+
+// 获取卡片颜色的函数
+const getCardColor = (index: number) => {
+  const colors = [
+    '142, 249, 252', // 青绿
+    '142, 252, 204', // 浅绿
+    '142, 252, 157', // 嫩绿
+    '215, 252, 142', // 黄绿
+    '252, 252, 142', // 柠檬黄
+    '252, 208, 142', // 橙黄
+    '252, 142, 142', // 粉红
+    '252, 142, 239', // 粉紫
+    '204, 142, 252', // 紫色
+    '142, 202, 252'  // 天蓝
+  ];
+  return colors[index];
+};
 
 const StyledWrapper = styled.div`
   width: 100%;
@@ -109,6 +125,32 @@ const StyledWrapper = styled.div`
         rgba(var(--colorCard), 0.6) 80%,
         rgba(var(--colorCard), 0.9) 100%
       );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .card-letter {
+    font-size: 70px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    transform: translateZ(10px);
+    user-select: none;
+    font-family: 'Arial', sans-serif;
+    transition: all 0.3s ease; /* 添加过渡效果 */
+    animation: pulse 1s infinite alternate; /* 添加脉动动画 */
+  }
+  
+  @keyframes pulse {
+    from {
+      text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      transform: translateZ(10px) scale(1);
+    }
+    to {
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 0 30px rgba(var(--colorCard), 0.6);
+      transform: translateZ(10px) scale(1.05);
+    }
   }
 `;
 
