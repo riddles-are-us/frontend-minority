@@ -1,13 +1,70 @@
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react"
 import { Chart, ArcElement, Tooltip, Legend } from "chart.js"
 import { Doughnut } from "react-chartjs-2"
 import { selectUserState, Nugget } from '../data/state';
 import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import ChartDataLabels from "chartjs-plugin-datalabels"
+import { createCommand } from "zkwasm-minirollup-rpc";
+import { sendTransaction } from '../request';
+import Loader from './Loader';
+import { useTheme } from 'styled-components';
+import styled from 'styled-components';
 
 // Register required Chart.js components and plugins
 Chart.register(ArcElement, Tooltip, ChartDataLabels)
+
+// Custom styled container to match the theme
+const ChartContainer = styled.div`
+  background-color: ${props => props.theme.bgSecondary};
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+`;
+
+const ChartTitle = styled.h2`
+  color: ${props => props.theme.primary};
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-align: center;
+`;
+
+const ChartWrapper = styled.div`
+  position: relative;
+  width: 100%;
+  height: 550px;
+  margin: 0 auto;
+`;
+
+const LoaderContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  
+  span {
+    margin-left: 0.5rem;
+    color: ${props => props.theme.success};
+  }
+`;
+
+// 添加一个数据更新消息容器
+const UpdateNotification = styled.div`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: ${props => props.theme.success};
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  
+  &.visible {
+    opacity: 1;
+  }
+`;
 
 // Custom plugin to draw the center text
 const centerTextPlugin = {
@@ -16,25 +73,28 @@ const centerTextPlugin = {
     const width = chart.width
     const height = chart.height
     const ctx = chart.ctx
+    const theme = chart.options.plugins.centerText.theme
 
     ctx.restore()
 
     // Calculate total from the first dataset
     const dataset = chart.data.datasets[0]
-    const total = dataset.data.reduce((sum: number, value: number) => sum + value, 0)
+    const rawTotal = dataset.data.reduce((sum: number, value: number) => sum + value, 0)
+    // 从总数中减去26，确保显示的总数是实际值减去26
+    const total = Math.max(0, rawTotal - 26)
 
     // Font size based on chart dimensions
-    const fontSize = Math.min(width, height) / 10
+    const fontSize = Math.min(width, height) / 8
     const smallerFontSize = fontSize * 0.6
 
     // Draw background circle
     const centerX = width / 2
     const centerY = height / 2
-    const radius = Math.min(width, height) / 6
+    const radius = Math.min(width, height) / 5
 
     ctx.beginPath()
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
-    ctx.fillStyle = "#ffffff"
+    ctx.fillStyle = theme.bgPrimary || "#ffffff"
     ctx.shadowColor = "rgba(0, 0, 0, 0.1)"
     ctx.shadowBlur = 10
     ctx.shadowOffsetX = 0
@@ -46,7 +106,7 @@ const centerTextPlugin = {
 
     // Draw total number
     ctx.font = `bold ${fontSize}px Arial`
-    ctx.fillStyle = "#333333"
+    ctx.fillStyle = theme.textPrimary || "#333333"
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
     ctx.fillText(total.toLocaleString(), centerX, centerY - smallerFontSize / 2)
@@ -62,129 +122,259 @@ const centerTextPlugin = {
 // Register the custom plugin
 Chart.register(centerTextPlugin)
 
+// Command constants
+const BUY_CARD = 4n;
+
+// 函数用于比较两个数组是否相等
+const arraysEqual = (a: number[], b: number[]): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+// 工具函数：深度比较对象是否相等
+const deepEqual = (obj1: any, obj2: any): boolean => {
+  if (obj1 === obj2) return true;
+  
+  if (typeof obj1 !== 'object' || obj1 === null || 
+      typeof obj2 !== 'object' || obj2 === null) {
+    return false;
+  }
+  
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  
+  if (keys1.length !== keys2.length) return false;
+  
+  for (const key of keys1) {
+    if (!keys2.includes(key)) return false;
+    
+    if (!deepEqual(obj1[key], obj2[key])) return false;
+  }
+  
+  return true;
+};
+
+// 包装Doughnut组件，避免不必要重渲染
+const MemoizedDoughnut = memo(Doughnut, (prevProps, nextProps) => {
+  // 如果数据相同，跳过重渲染
+  return deepEqual(prevProps.data, nextProps.data) && 
+         deepEqual(prevProps.options, nextProps.options);
+});
+
 export default function MultilevelPieChart() {
+  const theme = useTheme();
   const userState = useAppSelector(selectUserState);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const dispatch = useAppDispatch();
   const [chartData, setChartData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionComplete, setTransactionComplete] = useState(false);
+  const [activeSegment, setActiveSegment] = useState<number | null>(null);
+  const chartRef = useRef<any>(null);
+  const [dataUpdated, setDataUpdated] = useState(false);
+  const prevDataRef = useRef<number[]>([]);
+  // 记录上次更新的时间戳
+  const lastUpdateTimeRef = useRef<number>(Date.now());
 
   const LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+  // 使用useMemo获取当前数据，添加优化
+  const currentData = useMemo(() => {
+    return userState?.state?.cards || [];
+  }, [userState?.state?.cards]); // 更精确的依赖
+
+  // 检查数据是否发生变化 - 添加节流逻辑
   useEffect(() => {
-      if (userState) {
-          let labels = userState!.state.cards.map((_card:number, index:number) => {
-                  return LABELS[index]
-              });
-          let data = userState!.state.cards.map((card:number, index:number) => {
-                  return card + 1
-              });
-          const dataset = {
-              labels: labels,
-              datasets: [{
-                data: data,
-                backgroundColor: [
-                "#818cf8", // A1
-                "#6366f1", // A2
-                "#38bdf8", // B1
-                "#0284c7", // B2
-                "#a78bfa", // C1
-                "#7c3aed", // C2
-                "#6d28d9", // C3
-                ],
-                borderColor: ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"],
-                borderWidth: 2,
-              }],
-          }
-          setChartData(dataset);
-       }
-  }, [userState]);
-
-
-  const chartRef = useRef(null)
-  const [windowSize, setWindowSize] = useState({
-    width: typeof window !== "undefined" ? window.innerWidth : 0,
-    height: typeof window !== "undefined" ? window.innerHeight : 0,
-  })
-
-  const handleChartClick = (event: any, elements: any[], chart: any) => {
-    if (elements.length > 0) {
-      const { datasetIndex, index } = elements[0]
-
-      // Check if it's the inner chart (datasetIndex 0) and the first segment (Category A)
-      if (datasetIndex === 0) {
-          alert(`You clicked on ${index}`)
+    const prevData = prevDataRef.current;
+    
+    // 添加时间节流，避免频繁更新
+    const now = Date.now();
+    if (now - lastUpdateTimeRef.current < 2000) { // 至少2秒更新一次
+      return;
+    }
+    
+    // 只有在有当前数据和之前数据都存在，且长度大于0的情况下才比较
+    if (currentData.length > 0 && prevData.length > 0) {
+      // 使用辅助函数比较数组
+      const hasChanged = !arraysEqual(prevData, currentData);
+      
+      if (hasChanged) {
+        lastUpdateTimeRef.current = now;
+        setDataUpdated(true);
+        // 3秒后自动隐藏更新通知
+        setTimeout(() => {
+          setDataUpdated(false);
+        }, 3000);
       }
     }
-  }
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
+    
+    // 更新引用中保存的前一个状态
+    if (currentData.length > 0) {
+      prevDataRef.current = [...currentData];
     }
+  }, [currentData]); // 只依赖于currentData
 
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+  // Buy a card when a chart segment is clicked
+  const buyCard = useCallback((index: bigint, amount: bigint) => {
+    if(userState?.player) {
+      setIsLoading(true);
+      const command = createCommand(BigInt(userState.player.nonce), BUY_CARD, [index, amount]);
+      dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
+        .then((action) => {
+          if (sendTransaction.fulfilled.match(action)) {
+            setTransactionComplete(true);
+            // After 2 seconds, hide the loader and reset state
+            setTimeout(() => {
+              setIsLoading(false);
+              setTransactionComplete(false);
+            }, 2000);
+          } else {
+            setIsLoading(false);
+          }
+        });
+    }
+  }, [userState, l2account, dispatch]);
 
-  // Options for the outer chart
-  const outerOptions = {
+  // 更新图表数据 - 使用useMemo缓存数据，避免重复计算
+  const memoizedChartData = useMemo(() => {
+    if (!userState?.state?.cards) return null;
+    
+    const labels = userState.state.cards.map((_card:number, index:number) => LABELS[index]);
+    
+    // 实际数据不变，用于计算和交易
+    const data = userState.state.cards.map((card:number) => card + 1);
+        
+    // Theme colors for chart segments
+    const themeColors = [
+      theme.primary,       // Main primary color
+      theme.primaryLight,  // Light primary
+      theme.primaryDark,   // Dark primary
+      theme.secondary,     // Main secondary color
+      theme.secondaryLight,// Light secondary
+      theme.secondaryDark, // Dark secondary
+      theme.accent,        // Accent color
+      theme.accentLight,   // Light accent
+      theme.accentDark     // Dark accent
+    ];
+    
+    return {
+      labels,
+      datasets: [{
+        data,
+        // 保存原始数据，用于显示减1后的值
+        originalData: data.map(value => value - 1),
+        backgroundColor: themeColors.slice(0, data.length), // 确保颜色数组长度不超过数据长度
+        borderColor: Array(data.length).fill("#ffffff"),
+        borderWidth: 2,
+      }],
+    };
+  }, [userState?.state?.cards, theme]); // 更精确的依赖
+  
+  // 使用effect根据memoized数据更新chart状态，避免不必要的重渲染
+  useEffect(() => {
+    if (memoizedChartData && !deepEqual(memoizedChartData, chartData)) {
+      setChartData(memoizedChartData);
+    }
+  }, [memoizedChartData, chartData]);
+
+  const handleChartClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!chartRef.current) return;
+    
+    const chart = chartRef.current;
+    const activePoints = chart.getElementsAtEventForMode(
+      event.nativeEvent,
+      'nearest',
+      { intersect: true },
+      false
+    );
+    
+    if (activePoints.length > 0) {
+      const index = activePoints[0].index;
+      setActiveSegment(index);
+      buyCard(BigInt(index), 1n);
+      console.log(`Clicked on segment ${index}`);
+    }
+  }, [buyCard]);
+
+  // Options for the chart
+  const options = useMemo(() => ({
     responsive: true,
-    cutout: "75%",
+    maintainAspectRatio: false,
+    cutout: "70%",
+    onClick: undefined, // We handle clicks in our custom handler
     plugins: {
       legend: {
         display: false,
       },
+      centerText: {
+        theme: theme
+      },
       datalabels: {
-        color: "#ffffff",
-        //font:,
-        //textAlign: "center",
+        color: theme.textLight,
         formatter: (value: number, context: any) => {
           return context.chart.data.labels[context.dataIndex]
         },
-        //anchor: "center",
-        // align: "center",
-        // Adjust label position to be in the middle of the segment
-        offset: 0,
-        display: (context: any) => {
-            return true;
-        // Only display if segment is large enough
-            //return context.dataset.data[context.dataIndex] > 50
+        font: {
+          weight: 'bold' as const,
+          size: 18
         },
+        offset: 0,
+        display: true
       },
-
       tooltip: {
         callbacks: {
-          label: (context: any) => {
-            const label = context.label || ""
-            const value = context.raw || 0
-            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-            const percentage = Math.round((value / total) * 100)
-            return `${label}: ${value} (${percentage}%)`
-          },
-        },
-      },
-    onClick: handleChartClick,
-    onHover: (event: any, elements: any[]) => {
-      event.native.target.style.cursor = "pointer"
+          label: function(context: any) {
+            // 获取实际值
+            const actualValue = context.raw;
+            // 显示时减1
+            const displayValue = actualValue - 1;
+            const label = context.chart.data.labels[context.dataIndex];
+            
+            // 计算百分比时仍使用调整后的总数
+            const rawTotal = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const adjustedTotal = Math.max(0, rawTotal - 26);
+            
+            // 使用显示值计算百分比
+            const percentage = adjustedTotal > 0 ? Math.round((displayValue / adjustedTotal) * 100) : 0;
+            
+            // 返回减1后的显示值
+            return `${label}: ${displayValue} (${percentage}%)`
+          }
+        }
       }
     },
-  }
+  }), [theme]);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      <h2 className="text-xl font-semibold mb-4 text-center">Sales Distribution by Category</h2>
-      <div className="relative">
-        {/* Outer chart */}
-        <div className="absolute z-10">
-          {chartData &&
-          <Doughnut data={chartData} options={outerOptions} />
-          }
-        </div>
-      </div>
-    </div>
+    <ChartContainer>
+      <ChartTitle>Market Data</ChartTitle>
+      <ChartWrapper>
+        {chartData && (
+          <>
+            <MemoizedDoughnut 
+              data={chartData} 
+              options={options} 
+              ref={chartRef}
+              onClick={handleChartClick}
+            />
+            <UpdateNotification className={dataUpdated ? 'visible' : ''}>
+              Data Updated
+            </UpdateNotification>
+          </>
+        )}
+        
+        {/* Loading indicator */}
+        {isLoading && (
+          <LoaderContainer>
+            <Loader />
+            {transactionComplete && <span>Transaction Complete!</span>}
+          </LoaderContainer>
+        )}
+      </ChartWrapper>
+    </ChartContainer>
   )
 }
 

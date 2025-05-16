@@ -39,12 +39,24 @@ module.exports = function override(config, env) {
     config.devServer = {
       ...config.devServer,
       hot: true,
+      liveReload: true,
+      watchFiles: ['src/**/*'],
+      client: {
+        webSocketURL: {
+          hostname: '127.0.0.1',
+          pathname: '/ws',
+          port: 3001
+        },
+      },
       watchOptions: {
         poll: 1000,
         aggregateTimeout: 300,
         ignored: /node_modules/
       }
     };
+    
+    // Force disabling HTTPS for local development to avoid WSL2 issues
+    config.devServer.https = false;
   }
 
   config.module.rules.forEach(rule => {

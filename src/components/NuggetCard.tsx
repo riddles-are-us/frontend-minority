@@ -51,20 +51,34 @@ const StyledCardBody = styled(MDBCardBody)`
 interface StyledButtonProps {
   onClick?: () => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
 const StyledButton = styled(MDBBtn)<StyledButtonProps>`
   background-color: ${props => props.theme.secondary} !important;
   color: ${props => props.theme.textPrimary} !important;
   
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: ${props => props.theme.secondaryLight} !important;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
   }
   
-  &:active {
+  &:active:not(:disabled) {
     background-color: ${props => props.theme.secondaryDark} !important;
   }
+  
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+`;
+
+// 为不同回合添加提示
+const RoundMismatchInfo = styled.div`
+  color: ${props => props.theme.error};
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
 `;
 
 const INSTALL_PLAYER = 1n;
@@ -80,10 +94,13 @@ export function NuggetCard(params: {index: number, amount: number}) {
   const [isLoading, setIsLoading] = useState(false);
   const [transactionComplete, setTransactionComplete] = useState(false);
   
+  // 检查库存回合与当前回合是否一致
+  const isSameRound = userState?.player?.data.round === userState?.state?.round;
+  
   const buyCard = (index: bigint, amount: bigint) => {
-    if(userState!.player) {
+    if(userState?.player) {
         setIsLoading(true);
-        const command = createCommand(BigInt(userState!.player!.nonce), BUY_CARD, [index, amount]);
+        const command = createCommand(BigInt(userState.player.nonce), BUY_CARD, [index, amount]);
         dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
           .then((action) => {
             if (sendTransaction.fulfilled.match(action)) {
@@ -117,11 +134,17 @@ export function NuggetCard(params: {index: number, amount: number}) {
           </div>
         )}
         
+        {!isSameRound && (
+          <RoundMismatchInfo>
+            Round changed, buying disabled
+          </RoundMismatchInfo>
+        )}
+        
         <StyledButton 
           onClick={() => buyCard(BigInt(params.index), 1n)} 
-          disabled={isLoading}
+          disabled={isLoading || !isSameRound}
         >
-          {isLoading ? 'Processing...' : 'Buy'}
+          {isLoading ? 'Processing...' : isSameRound ? 'Buy More' : 'Buy'}
         </StyledButton>
       </StyledCardBody>
     </StyledCard>

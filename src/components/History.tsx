@@ -85,16 +85,29 @@ export const HistoryPage = () => {
   const [loadingRounds, setLoadingRounds] = useState<{[key: string]: boolean}>({});
   const [completedRounds, setCompletedRounds] = useState<{[key: string]: boolean}>({});
 
+  // 检查是否有未领取的奖励
+  const hasUnclaimedRewards = userState?.player?.data.rounds && 
+                             Array.isArray(userState.player.data.rounds) && 
+                             userState.player.data.rounds.length > 0;
+
+  // 记录奖励数据状态
   useEffect(() => {
-  }, [userState]);
+    if (userState?.player?.data) {
+      if (hasUnclaimedRewards) {
+        console.log('Unclaimed rewards available:', userState.player.data.rounds.length, 'items');
+      } else {
+        console.log('No unclaimed rewards available');
+      }
+    }
+  }, [userState, hasUnclaimedRewards]);
 
   const claimReward = (index: bigint) => {
-    if(userState!.player) {
+    if(userState?.player) {
         const roundKey = index.toString();
         // Start loading
         setLoadingRounds(prev => ({...prev, [roundKey]: true}));
         
-        const command = createCommand(BigInt(userState!.player!.nonce), CLAIM_REWARD, [index]);
+        const command = createCommand(BigInt(userState.player.nonce), CLAIM_REWARD, [index]);
         dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
         .then((action) => {
           if (sendTransaction.fulfilled.match(action)) {
@@ -112,6 +125,9 @@ export const HistoryPage = () => {
         });
     }
   }
+
+  // 如果没有奖励数据，不渲染任何内容
+  if (!hasUnclaimedRewards) return null;
 
   return (
     <>
