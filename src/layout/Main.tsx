@@ -14,6 +14,7 @@ import { User } from "../components/User";
 import Nav from "../components/Nav";
 import ErrorModal from "../components/ErrorModal";
 import { HistoryPage } from "../components/History";
+import AnimatedBackground from "../components/AnimatedBackground";
 import {
     MDBBtn,
     MDBContainer,
@@ -76,27 +77,9 @@ const InfoText = styled.p`
   }
 `;
 
-// 倒计时小于10秒时使用特殊样式
-const TimerSpan = styled.span<{ isLow: boolean }>`
-  font-weight: bold;
-  color: ${props => props.isLow ? props.theme.error : props.theme.primary};
-  transition: color 0.3s ease;
-  ${props => props.isLow && `
-    animation: pulse 1s infinite;
-  `}
-  
-  @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.7; }
-    100% { opacity: 1; }
-  }
-`;
-
 const REGISTER_PLAYER = 1n;
 // 更新轮询间隔为3秒，减少卡顿
 const POLLING_INTERVAL = 3000;
-// 倒计时更新间隔（毫秒）
-const COUNTDOWN_INTERVAL = 1000;
 
 export function Main() {
   const connectState = useAppSelector(selectConnectState);
@@ -302,6 +285,7 @@ export function Main() {
 
   return (
     <>
+      <AnimatedBackground />
       <Nav />
       <StyledContainer>
       {userState?.player &&

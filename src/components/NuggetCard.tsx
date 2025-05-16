@@ -81,11 +81,43 @@ const RoundMismatchInfo = styled.div`
   font-style: italic;
 `;
 
+// Add a styled badge for transaction complete message
+const SuccessBadge = styled.div`
+  background-color: ${props => props.theme.success};
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  
+  &::before {
+    content: "✓";
+    display: inline-block;
+    margin-right: 8px;
+    font-weight: bold;
+  }
+  
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
 const INSTALL_PLAYER = 1n;
 const WITHDRAW = 2n;
 const DEPOSIT = 3n;
 const BUY_CARD = 4n;
 const CLAIM_REWARD = 5n;
+
+// 数字转字母的辅助函数
+const indexToLetter = (index: number): string => {
+  // 将数字转为对应的字母，0->A, 1->B, ...
+  return String.fromCharCode(65 + index); // 65是ASCII中'A'的编码
+};
 
 export function NuggetCard(params: {index: number, amount: number}) {
   const dispatch = useAppDispatch();
@@ -104,10 +136,10 @@ export function NuggetCard(params: {index: number, amount: number}) {
         dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
           .then((action) => {
             if (sendTransaction.fulfilled.match(action)) {
+              setIsLoading(false);
               setTransactionComplete(true);
-              // After 2 seconds, hide the loader and reset state
+              // After 2 seconds, hide transaction complete message
               setTimeout(() => {
-                setIsLoading(false);
                 setTransactionComplete(false);
               }, 2000);
             } else {
@@ -121,7 +153,7 @@ export function NuggetCard(params: {index: number, amount: number}) {
     <StyledCard>
       <StyledCardHeader>
         <div className="d-flex">
-          <h5>NuggetID: {params.index}</h5>
+          <h5>Choice ID: {indexToLetter(params.index)}</h5>
         </div>
       </StyledCardHeader>
       <StyledCardBody>
@@ -130,7 +162,12 @@ export function NuggetCard(params: {index: number, amount: number}) {
         {isLoading && (
           <div className="loader-container">
             <Loader />
-            {transactionComplete && <span style={{marginLeft: '10px'}}>Transaction Complete!</span>}
+          </div>
+        )}
+        
+        {transactionComplete && (
+          <div className="loader-container">
+            <SuccessBadge>Transaction Complete!</SuccessBadge>
           </div>
         )}
         

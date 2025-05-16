@@ -20,6 +20,12 @@ const ChartContainer = styled.div`
   padding: 1.5rem;
   border-radius: 0.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  
+  @media (max-width: 768px) {
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
 `;
 
 const ChartTitle = styled.h2`
@@ -27,6 +33,11 @@ const ChartTitle = styled.h2`
   font-weight: 600;
   margin-bottom: 1rem;
   text-align: center;
+  
+  @media (max-width: 768px) {
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+  }
 `;
 
 const ChartWrapper = styled.div`
@@ -34,6 +45,12 @@ const ChartWrapper = styled.div`
   width: 100%;
   height: 550px;
   margin: 0 auto;
+  
+  @media (max-width: 768px) {
+    height: 400px;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
 `;
 
 const LoaderContainer = styled.div`
@@ -66,6 +83,32 @@ const UpdateNotification = styled.div`
   }
 `;
 
+// Add a styled badge for transaction complete message
+const SuccessBadge = styled.div`
+  background-color: ${props => props.theme.success};
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  
+  &::before {
+    content: "✓";
+    display: inline-block;
+    margin-right: 8px;
+    font-weight: bold;
+  }
+  
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
 // Custom plugin to draw the center text
 const centerTextPlugin = {
   id: "centerText",
@@ -74,6 +117,7 @@ const centerTextPlugin = {
     const height = chart.height
     const ctx = chart.ctx
     const theme = chart.options.plugins.centerText.theme
+    const isMobile = width < 500 // 判断是否为移动设备
 
     ctx.restore()
 
@@ -83,14 +127,16 @@ const centerTextPlugin = {
     // 从总数中减去26，确保显示的总数是实际值减去26
     const total = Math.max(0, rawTotal - 26)
 
-    // Font size based on chart dimensions
-    const fontSize = Math.min(width, height) / 8
-    const smallerFontSize = fontSize * 0.6
+    // Font size based on chart dimensions, smaller for mobile
+    const fontSize = isMobile 
+      ? Math.min(width, height) / 10 
+      : Math.min(width, height) / 8
+    const smallerFontSize = fontSize * (isMobile ? 0.5 : 0.6)
 
     // Draw background circle
     const centerX = width / 2
     const centerY = height / 2
-    const radius = Math.min(width, height) / 5
+    const radius = Math.min(width, height) / (isMobile ? 6 : 5)
 
     ctx.beginPath()
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
@@ -225,10 +271,10 @@ export default function MultilevelPieChart() {
       dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
         .then((action) => {
           if (sendTransaction.fulfilled.match(action)) {
+            setIsLoading(false);
             setTransactionComplete(true);
-            // After 2 seconds, hide the loader and reset state
+            // After 2 seconds, hide the transaction complete message
             setTimeout(() => {
-              setIsLoading(false);
               setTransactionComplete(false);
             }, 2000);
           } else {
@@ -319,7 +365,7 @@ export default function MultilevelPieChart() {
         },
         font: {
           weight: 'bold' as const,
-          size: 18
+          size: window.innerWidth < 768 ? 14 : 18
         },
         offset: 0,
         display: true
@@ -366,11 +412,16 @@ export default function MultilevelPieChart() {
           </>
         )}
         
-        {/* Loading indicator */}
+        {/* Loading indicator or Transaction Complete */}
         {isLoading && (
           <LoaderContainer>
             <Loader />
-            {transactionComplete && <span>Transaction Complete!</span>}
+          </LoaderContainer>
+        )}
+        
+        {transactionComplete && (
+          <LoaderContainer>
+            <SuccessBadge>Transaction Complete!</SuccessBadge>
           </LoaderContainer>
         )}
       </ChartWrapper>

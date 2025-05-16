@@ -5,6 +5,7 @@ import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { NuggetCard } from "../components/NuggetCard";
 import { WithdrawModal } from "../components/Common";
 import { setUIState, ModalIndicator, selectUIState } from "../data/ui";
+import Record from "./Record";
 import styled from 'styled-components';
 
 const StyledCard = styled(MDBCard)`
@@ -65,6 +66,81 @@ const StyledButton = styled(MDBBtn)<StyledButtonProps>`
   &:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+  }
+`;
+
+// 创建一个容器用于包含图标和标题
+const HeaderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid ${props => props.theme.primaryLight};
+  padding-bottom: 0.5rem;
+`;
+
+// 标题左侧部分
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+`;
+
+// 折叠按钮样式
+const CollapseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme.secondary};
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  
+  &:hover {
+    color: ${props => props.theme.primary};
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  &:focus {
+    outline: none;
+  }
+`;
+
+// 标题文本样式
+const HeaderText = styled.h3`
+  color: ${props => props.theme.primary};
+  font-weight: 600;
+  margin: 0;
+  padding-top: 5px;
+`;
+
+// 调整Record动画大小的容器
+const RecordContainer = styled.div`
+  height: 40px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-right: 0.2rem;
+  
+  svg {
+    transform: scale(0.18);
+    transform-origin: center;
+  }
+  
+  @media (max-width: 576px) {
+    height: 35px;
+    width: 35px;
+    
+    svg {
+      transform: scale(0.16);
+    }
   }
 `;
 
@@ -144,6 +220,7 @@ export const User = () => {
   const userState = useAppSelector(selectUserState);
   const uiState = useAppSelector(selectUIState);
   const dispatch = useAppDispatch();
+  const [inventoryCollapsed, setInventoryCollapsed] = useState(false);
 
   const lpanel = useRef<HTMLDivElement | null>(null);
   
@@ -174,6 +251,10 @@ export const User = () => {
   function deposit() {
     dispatch(setUIState({modal: ModalIndicator.DEPOSIT}));
   }
+
+  const toggleInventory = () => {
+    setInventoryCollapsed(!inventoryCollapsed);
+  };
 
   return (<>
      <MDBRow>
@@ -212,31 +293,45 @@ export const User = () => {
       {/* 只有当真正有库存数据时才显示此部分 */}
       {hasInventoryData && userState?.player && (
         <>
-          <SectionHeader>Inventory</SectionHeader>
+          <HeaderContainer>
+            <HeaderLeft>
+              <RecordContainer>
+                <Record />
+              </RecordContainer>
+              <HeaderText>Inventory</HeaderText>
+            </HeaderLeft>
+            <CollapseButton onClick={toggleInventory}>
+              {inventoryCollapsed ? '▼' : '▲'}
+            </CollapseButton>
+          </HeaderContainer>
           
-          {/* 显示库存所属的轮次信息 */}
-          <RoundInfo>
-            <FromRoundBadge>
-              From Round: {userState.player.data.round}
-            </FromRoundBadge>
-            {userState.state && userState.player.data.round !== userState.state.round && (
-              <RoundBadge>
-                Current Round: {userState.state.round}
-              </RoundBadge>
-            )}
-          </RoundInfo>
-          
-          <MDBRow>
-          {
-              userState.player.data.purchase.map((card:any) => {
-                 return (
-                    <MDBCol md="3" className="mt-3" key={card.index}>
-                    <NuggetCard index={card.index} amount={card.amount}/>
-                    </MDBCol>
-                 );
-              })
-          }
-          </MDBRow>
+          {!inventoryCollapsed && (
+            <>
+              {/* 显示库存所属的轮次信息 */}
+              <RoundInfo>
+                <FromRoundBadge>
+                  From Round: {userState.player.data.round}
+                </FromRoundBadge>
+                {userState.state && userState.player.data.round !== userState.state.round && (
+                  <RoundBadge>
+                    Current Round: {userState.state.round}
+                  </RoundBadge>
+                )}
+              </RoundInfo>
+              
+              <MDBRow>
+              {
+                  userState.player.data.purchase.map((card:any) => {
+                     return (
+                        <MDBCol md="3" className="mt-3" key={card.index}>
+                        <NuggetCard index={card.index} amount={card.amount}/>
+                        </MDBCol>
+                     );
+                  })
+              }
+              </MDBRow>
+            </>
+          )}
         </>
       )}
     </>);

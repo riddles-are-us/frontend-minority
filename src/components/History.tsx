@@ -8,14 +8,83 @@ import { AccountSlice } from "zkwasm-minirollup-browser";
 import "./style.scss";
 import styled from 'styled-components';
 import Loader from './Loader';
+import Coin from './Coin';
 
-const SectionHeader = styled.h3`
-  color: ${props => props.theme.primary};
-  font-weight: 600;
+
+// 创建一个容器用于包含图标和标题
+const HeaderContainer = styled.div`
+  display: flex;
+  align-items: center;
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   border-bottom: 2px solid ${props => props.theme.primaryLight};
   padding-bottom: 0.5rem;
+`;
+
+// 标题左侧部分
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+`;
+
+// 折叠按钮样式
+const CollapseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme.secondary};
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  
+  &:hover {
+    color: ${props => props.theme.primary};
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  &:focus {
+    outline: none;
+  }
+`;
+
+// 标题文本样式
+const HeaderText = styled.h3`
+  color: ${props => props.theme.primary};
+  font-weight: 600;
+  margin: 0;
+  padding-top: 5px;
+`;
+
+// 调整硬币大小的容器
+const CoinContainer = styled.div`
+  position: relative;
+  height: 35px;
+  width: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  margin-right: 0.2rem;
+  
+  .coin {
+    transform: scale(0.9);
+    transform-origin: center;
+  }
+  
+  @media (max-width: 576px) {
+    height: 30px;
+    width: 30px;
+    
+    .coin {
+      transform: scale(0.8);
+    }
+  }
 `;
 
 const RewardCard = styled(MDBCard)`
@@ -55,6 +124,7 @@ const RewardCardBody = styled(MDBCardBody)`
 interface StyledButtonProps {
   onClick?: () => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
 const StyledButton = styled(MDBBtn)<StyledButtonProps>`
@@ -84,6 +154,7 @@ export const HistoryPage = () => {
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const [loadingRounds, setLoadingRounds] = useState<{[key: string]: boolean}>({});
   const [completedRounds, setCompletedRounds] = useState<{[key: string]: boolean}>({});
+  const [rewardsCollapsed, setRewardsCollapsed] = useState(false);
 
   // 检查是否有未领取的奖励
   const hasUnclaimedRewards = userState?.player?.data.rounds && 
@@ -126,46 +197,63 @@ export const HistoryPage = () => {
     }
   }
 
+  const toggleRewards = () => {
+    setRewardsCollapsed(!rewardsCollapsed);
+  };
+
   // 如果没有奖励数据，不渲染任何内容
   if (!hasUnclaimedRewards) return null;
 
   return (
     <>
-      <SectionHeader>Unclaimed Rewards</SectionHeader>
-      <MDBRow>
-      {
-          userState!.player!.data.rounds.map((round:any) => {
-            const roundKey = round.round.toString();
-            const isLoading = loadingRounds[roundKey] || false;
-            const isCompleted = completedRounds[roundKey] || false;
-            
-            return (
-              <MDBCol md="3" className="mt-4" key={round.round}>
-                <RewardCard>
-                  <RewardCardBody>
-                    <p>Round: <span>{round.round}</span></p>
-                    <p>Share: <span>{round.ratio}</span></p>
-                    
-                    {isLoading && (
-                      <div className="loader-container">
-                        <Loader />
-                        {isCompleted && <span style={{marginLeft: '10px'}}>Claimed!</span>}
-                      </div>
-                    )}
-                    
-                    <StyledButton 
-                      onClick={() => claimReward(BigInt(round.round))}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Processing...' : 'Claim Reward'}
-                    </StyledButton>
-                  </RewardCardBody>
-                </RewardCard>
-              </MDBCol>
-            );
-          })
-      }
-      </MDBRow>
+      <HeaderContainer>
+        <HeaderLeft>
+          <CoinContainer>
+            <Coin />
+          </CoinContainer>
+          <HeaderText>Unclaimed Rewards</HeaderText>
+        </HeaderLeft>
+        <CollapseButton onClick={toggleRewards}>
+          {rewardsCollapsed ? '▼' : '▲'}
+        </CollapseButton>
+      </HeaderContainer>
+      
+      {!rewardsCollapsed && (
+        <MDBRow>
+        {
+            userState!.player!.data.rounds.map((round:any) => {
+              const roundKey = round.round.toString();
+              const isLoading = loadingRounds[roundKey] || false;
+              const isCompleted = completedRounds[roundKey] || false;
+              
+              return (
+                <MDBCol md="3" className="mt-4" key={round.round}>
+                  <RewardCard>
+                    <RewardCardBody>
+                      <p>Round: <span>{round.round}</span></p>
+                      <p>Share: <span>{round.ratio}</span></p>
+                      
+                      {isLoading && (
+                        <div className="loader-container">
+                          <Loader />
+                          {isCompleted && <span style={{marginLeft: '10px'}}>Claimed!</span>}
+                        </div>
+                      )}
+                      
+                      <StyledButton 
+                        onClick={() => claimReward(BigInt(round.round))}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? 'Processing...' : 'Claim Reward'}
+                      </StyledButton>
+                    </RewardCardBody>
+                  </RewardCard>
+                </MDBCol>
+              );
+            })
+        }
+        </MDBRow>
+      )}
     </>
   );
 }
