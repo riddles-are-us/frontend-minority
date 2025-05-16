@@ -43,6 +43,7 @@ export const getRounds = createAsyncThunk(
 )
 
 export enum ModalIndicator {
+  NONE,
   WITHDRAW,
   DEPOSIT,
   RESPONSE,

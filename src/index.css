@@ -5,8 +5,14 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-white) !important;
+  background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+  background-attachment: fixed;
+  background-size: cover;
+  position: relative;
+  overflow-x: hidden;
 }
+
+/* The animated background is now handled by the React component */
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
@@ -16,18 +22,19 @@ code {
 #root,
 body,
 html {
-  --bg-blue: #ebdbb2;
-  --bg-black: #000000;
-  --bg-white: #ffffff;
-  --navbar-bg: #d5c4a1;
-  --button-main: #546f80;
-  --button-hover: #fabd2f;
-  --button-click: #2e3c46;
-  --info-text-color: #795f51;
-  --blue-text-color: #795f51;
-  --table-bg: #546f80;
-  --table-border-color: #2e3c46;
-  --icon-hover: #f1f0e1;
+  /* Orange-yellow theme */
+  --bg-blue: #FFF8E1; /* Changed to light amber background */
+  --bg-black: #212121; /* Changed to dark gray */
+  --bg-white: #FFFFFF; /* Kept white */
+  --navbar-bg: #FF9800; /* Changed to orange */
+  --button-main: #FFC107; /* Changed to amber */
+  --button-hover: #FFD54F; /* Changed to light amber */
+  --button-click: #F57C00; /* Changed to dark orange */
+  --info-text-color: #F57C00; /* Changed to dark orange */
+  --blue-text-color: #FF9800; /* Changed to orange */
+  --table-bg: #FFF3E0; /* Changed to very light orange */
+  --table-border-color: #FFB74D; /* Changed to light orange */
+  --icon-hover: #FFF176; /* Changed to light yellow */
 }
 
 @font-face {
