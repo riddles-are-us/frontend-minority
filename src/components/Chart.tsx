@@ -9,6 +9,7 @@ import { createCommand } from "zkwasm-minirollup-rpc";
 import { sendTransaction } from '../request';
 import Loader from './Loader';
 import { useTheme } from 'styled-components';
+import { BUY_CARD } from '../request';
 import styled from 'styled-components';
 
 // Register required Chart.js components and plugins
@@ -167,9 +168,6 @@ const centerTextPlugin = {
 
 // Register the custom plugin
 Chart.register(centerTextPlugin)
-
-// Command constants
-const BUY_CARD = 4n;
 
 // 函数用于比较两个数组是否相等
 const arraysEqual = (a: number[], b: number[]): boolean => {

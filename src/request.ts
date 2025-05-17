@@ -110,3 +110,35 @@ export const queryInitialState = createAsyncThunk(
     }
   }
 );
+
+async function queryData(url: string) {
+  try {
+    const data: any = await rpc.queryData(url)
+    return data.data;
+  } catch (error: any) {
+    if (error.response) {
+      if (error.response.status === 500) {
+        throw new Error("QueryStateError");
+      } else {
+        throw new Error("UnknownError");
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+      // http.ClientRequest in node.js
+      throw new Error("No response was received from the server, please check your network connection.");
+    } else {
+      throw new Error("UnknownError");
+    }
+  }
+}
+
+export async function queryRound(round: number) {
+  return await queryData(`round/${round}`);
+}
+
+export const BUY_CARD = 4n;
+export const CLAIM_REWARD = 5n;
+export const SETTLE = 6n;
+
+

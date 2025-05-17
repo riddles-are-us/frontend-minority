@@ -4,8 +4,11 @@ import { selectUserState } from '../data/state';
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { NuggetCard } from "../components/NuggetCard";
 import { WithdrawModal } from "../components/Common";
-import { setUIState, ModalIndicator, selectUIState } from "../data/ui";
+import { AccountSlice } from "zkwasm-minirollup-browser";
+import { setUIState, ModalIndicator, selectUIState, selectRounds, getRound, RoundResult} from "../data/ui";
 import Record from "./Record";
+import { createCommand } from "zkwasm-minirollup-rpc";
+import { sendTransaction } from '../request';
 import styled from 'styled-components';
 
 // Profile Card
@@ -315,9 +318,11 @@ const EmptyInventory = styled.div`
 export const User = () => {
   const userState = useAppSelector(selectUserState);
   const uiState = useAppSelector(selectUIState);
+  const l2account = useAppSelector(AccountSlice.selectL2Account);
+  const roundsInfo = useAppSelector(selectRounds);
   const dispatch = useAppDispatch();
   const [inventoryCollapsed, setInventoryCollapsed] = useState(false);
-  
+
   // Check if modal is active
   const isModalActive = uiState.modal === ModalIndicator.WITHDRAW || 
                          uiState.modal === ModalIndicator.DEPOSIT;
@@ -335,8 +340,32 @@ export const User = () => {
       } else {
         console.log('No inventory data available');
       }
+      const isSameRound = userState?.player?.data.round === userState?.state?.round;
+      if (!isSameRound) {
+        if (roundsInfo.has(userState!.player!.data.round)) {
+          const roundInfo = roundsInfo.get(userState!.player!.data.round)!;
+          console.log("roundinfo", roundInfo);
+        } else {
+          dispatch(getRound(userState!.player!.data.round));
+        }
+      }
     }
-  }, [userState, hasInventoryData]);
+    // 检查库存回合与当前回合是否一致
+
+
+  }, [userState, hasInventoryData, roundsInfo]);
+
+
+  function isWinningCard(index: number) {
+      if (roundsInfo.has(userState!.player!.data.round)) {
+        let winner = Number(roundsInfo.get(userState!.player!.data.round)!.winner);
+        return winner == index;
+      }
+      else {
+        return false
+      }
+  }
+
 
   function withdraw() {
     dispatch(setUIState({modal: ModalIndicator.WITHDRAW}));
@@ -371,7 +400,7 @@ export const User = () => {
                   >
                     {uiState.modal === ModalIndicator.WITHDRAW ? 'Processing...' : 'Withdraw'}
                   </ActionButton>
-                  
+
                   <ActionButton 
                     variant="deposit"
                     onClick={() => deposit()} 
@@ -384,7 +413,7 @@ export const User = () => {
           </ProfileCard>
         </MDBCol>
       </MDBRow>
-      
+
       <HeaderContainer>
         <HeaderLeft>
           <RecordContainer>
@@ -398,7 +427,7 @@ export const User = () => {
           </CollapseButton>
         )}
       </HeaderContainer>
-      
+
       {!hasInventoryData ? (
         <EmptyInventory>
           Your inventory is empty. Buy some cards to get started!
@@ -408,6 +437,8 @@ export const User = () => {
           <RoundInfo>
             <FromRoundBadge>
               From Round: {userState.player.data.round}
+              {roundsInfo.has(userState.player.data.round)
+              }
             </FromRoundBadge>
             {userState.state && userState.player.data.round !== userState.state.round && (
               <RoundBadge>
@@ -415,13 +446,13 @@ export const User = () => {
               </RoundBadge>
             )}
           </RoundInfo>
-          
+
           <MDBRow>
           {
               userState.player.data.purchase.map((card:any) => {
                  return (
                     <MDBCol md="3" className="mt-3" key={card.index}>
-                    <NuggetCard index={card.index} amount={card.amount}/>
+                    <NuggetCard index={card.index} amount={card.amount} win={isWinningCard(card.index)}/>
                     </MDBCol>
                  );
               })
@@ -429,7 +460,7 @@ export const User = () => {
           </MDBRow>
         </>
       )}
-      
+
       {/* 将 WithdrawModal 放在应用程序根级别 */}
       <WithdrawModal 
         lpanel={document.getElementById('modal-root') || document.body} 

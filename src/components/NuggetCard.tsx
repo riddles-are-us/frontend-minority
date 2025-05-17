@@ -7,6 +7,7 @@ import { AccountSlice, ConnectState } from "zkwasm-minirollup-browser";
 import { selectUserState } from '../data/state';
 import styled from 'styled-components';
 import Loader from './Loader';
+import { SETTLE } from '../request';
 
 const StyledCard = styled(MDBCard)`
   border-radius: 8px;
@@ -107,11 +108,7 @@ const SuccessBadge = styled.div`
   }
 `;
 
-const INSTALL_PLAYER = 1n;
-const WITHDRAW = 2n;
-const DEPOSIT = 3n;
 const BUY_CARD = 4n;
-const CLAIM_REWARD = 5n;
 
 // 数字转字母的辅助函数
 const indexToLetter = (index: number): string => {
@@ -119,16 +116,16 @@ const indexToLetter = (index: number): string => {
   return String.fromCharCode(65 + index); // 65是ASCII中'A'的编码
 };
 
-export function NuggetCard(params: {index: number, amount: number}) {
+export function NuggetCard(params: {index: number, amount: number, win: boolean}) {
   const dispatch = useAppDispatch();
   const userState = useAppSelector(selectUserState);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const [isLoading, setIsLoading] = useState(false);
   const [transactionComplete, setTransactionComplete] = useState(false);
-  
+
   // 检查库存回合与当前回合是否一致
   const isSameRound = userState?.player?.data.round === userState?.state?.round;
-  
+
   const buyCard = (index: bigint, amount: bigint) => {
     if(userState?.player) {
         setIsLoading(true);
@@ -149,40 +146,66 @@ export function NuggetCard(params: {index: number, amount: number}) {
     }
   }
 
+  async function settle() {
+    if (userState?.player?.data) {
+      const isSameRound = userState?.player?.data.round === userState?.state?.round;
+      if (!isSameRound) {
+        const command = createCommand(BigInt(userState.player.nonce), SETTLE, []);
+        dispatch(sendTransaction({
+            cmd: command,
+            prikey: l2account!.getPrivateKey()
+        }));
+      }
+    }
+  };
+
+
   return (
     <StyledCard>
       <StyledCardHeader>
         <div className="d-flex">
-          <h5>Choice ID: {indexToLetter(params.index)}</h5>
+          <h5>{indexToLetter(params.index)}</h5>
         </div>
       </StyledCardHeader>
       <StyledCardBody>
-        <p>Holder: {params.amount}</p>
-        
+        <p>Holding Number: {params.amount}</p>
+
         {isLoading && (
           <div className="loader-container">
             <Loader />
           </div>
         )}
-        
+
         {transactionComplete && (
           <div className="loader-container">
             <SuccessBadge>Transaction Complete!</SuccessBadge>
           </div>
         )}
-        
+
+
         {!isSameRound && (
           <RoundMismatchInfo>
             Round changed, buying disabled
           </RoundMismatchInfo>
         )}
-        
+
+        {!isSameRound && params.win && (
+          <StyledButton 
+            onClick={() => settle()} 
+            >
+            Win
+          </StyledButton>
+        )}
+
+
+        {isSameRound &&
         <StyledButton 
           onClick={() => buyCard(BigInt(params.index), 1n)} 
           disabled={isLoading || !isSameRound}
         >
-          {isLoading ? 'Processing...' : isSameRound ? 'Buy More' : 'Buy'}
+          {isLoading ? 'Processing...' : 'Buy More'}
         </StyledButton>
+        }
       </StyledCardBody>
     </StyledCard>
   )

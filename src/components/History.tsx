@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createCommand } from "zkwasm-minirollup-rpc";
-import { sendTransaction } from '../request';
+import { CLAIM_REWARD, sendTransaction } from '../request';
 import { MDBRow, MDBCol, MDBBtn, MDBCard, MDBCardBody } from 'mdb-react-ui-kit';
 import { selectUserState} from '../data/state';
 import { useAppSelector, useAppDispatch } from "../app/hooks";
@@ -212,12 +212,6 @@ const StyledButton = styled(MDBBtn)<StyledButtonProps>`
     cursor: not-allowed;
   }
 `;
-
-const INSTALL_PLAYER = 1n;
-const WITHDRAW = 2n;
-const DEPOSIT = 3n;
-const BUY_CARD = 4n;
-const CLAIM_REWARD = 5n;
 
 export const HistoryPage = () => {
   const userState = useAppSelector(selectUserState);

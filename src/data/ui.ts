@@ -4,6 +4,10 @@ import { LeHexBN, query } from 'zkwasm-minirollup-rpc';
 import { RootState } from '../app/store';
 import { Nugget } from './state';
 
+import { enableMapSet } from 'immer';
+
+// enable Map and Set support in Immer
+enableMapSet();
 async function queryData(url: string) {
   try {
     const data: any = await rpc.queryData(url)
@@ -27,11 +31,15 @@ async function queryData(url: string) {
 }
 
 async function queryRound(index: number) {
-  return await queryData(`/round/${index}`);
+  let data = await queryData(`round/${index}`);
+  return  {
+      round: index,
+      info: data[0],
+  }
 }
 
-export const getRounds = createAsyncThunk(
-  'client/getNuggets',
+export const getRound = createAsyncThunk(
+  'client/getRound',
   async (page: number, { rejectWithValue }) => {
     try {
       const res: any = await queryRound(page);
@@ -53,32 +61,21 @@ interface UIState {
   modal: null | ModalIndicator;
 }
 
-export interface FocusNugget {
-  nugget: Nugget,
-  index: number | null
-}
-
-interface NuggetsState {
-  nuggets: Nugget[]
-  inventory: Nugget[]
-  bids: Nugget[]
-  focus: FocusNugget | null
+export interface RoundResult {
+  winner: bigint,
+  pool: bigint,
+  total: bigint
 }
 
 export interface PropertiesState {
-    nuggets: NuggetsState;
+    rounds: Map<number, RoundResult>;
     uiState: UIState;
     lastError: RequestError | null,
     lastResponse: string | null,
 }
 
 const initialState: PropertiesState = {
-  nuggets: {
-    nuggets: [],
-    inventory: [], 
-    bids:[],
-    focus: null,
-  },
+  rounds: new Map(),
   lastError: null,
   lastResponse: null,
   uiState: {
@@ -96,17 +93,15 @@ const uiSlice = createSlice({
     setUIResponse: (state, d: PayloadAction<string>) => {
       state.lastResponse = d.payload;
     },
-    setFocus: (state, d: PayloadAction<FocusNugget | null>) => {
-      state.nuggets.focus = d.payload;
-    }
   },
 
   extraReducers: (builder) => {
     builder
-      .addCase(getRounds.fulfilled, (state, action) => {
-        //state.nuggets.bids = action.payload;
+      .addCase(getRound.fulfilled, (state, action) => {
+        const round = action.payload;
+        state.rounds.set(round.round, round.info);
       })
-      .addCase(getRounds.rejected, (state, action) => {
+      .addCase(getRound.rejected, (state, action) => {
         state.lastError = {
           errorInfo:`send transaction rejected: ${action.payload}`,
           payload: action.payload,
@@ -116,6 +111,7 @@ const uiSlice = createSlice({
 });
 
 export const selectUIState = (state: RootState) => state.extra.uiState;
+export const selectRounds = (state: RootState) => state.extra.rounds;
 export const selectUIResponse = (state: RootState) => state.extra.lastResponse;
-export const { setUIState, setUIResponse, setFocus } = uiSlice.actions;
+export const { setUIState, setUIResponse } = uiSlice.actions;
 export default uiSlice.reducer;

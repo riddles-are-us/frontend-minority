@@ -11,6 +11,7 @@ export const store = configureStore({
         ignoredPaths: [
           "acccount/fetchAccount/fulfilled",
           "account.l1Account.web3",
+          "extra.rounds",
           "endpoint.zkWasmServiceHelper",
           "account.l2account"
         ],
