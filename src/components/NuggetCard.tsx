@@ -129,10 +129,15 @@ export function NuggetCard(params: {index: number, amount: number, win: boolean}
   const buyCard = (index: bigint, amount: bigint) => {
     if(userState?.player) {
         setIsLoading(true);
+        
+        // 记录当前使用的nonce，便于调试
+        console.log(`NuggetCard - Using nonce: ${userState.player.nonce} for index: ${index}`);
+        
         const command = createCommand(BigInt(userState.player.nonce), BUY_CARD, [index, amount]);
         dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
           .then((action) => {
             if (sendTransaction.fulfilled.match(action)) {
+              console.log("NuggetCard - Transaction successful:", action);
               setIsLoading(false);
               setTransactionComplete(true);
               // After 2 seconds, hide transaction complete message
@@ -140,8 +145,13 @@ export function NuggetCard(params: {index: number, amount: number, win: boolean}
                 setTransactionComplete(false);
               }, 2000);
             } else {
+              console.error("NuggetCard - Transaction failed:", action);
               setIsLoading(false);
             }
+          })
+          .catch(error => {
+            console.error("NuggetCard - Transaction error:", error);
+            setIsLoading(false);
           });
     }
   }
@@ -150,11 +160,34 @@ export function NuggetCard(params: {index: number, amount: number, win: boolean}
     if (userState?.player?.data) {
       const isSameRound = userState?.player?.data.round === userState?.state?.round;
       if (!isSameRound) {
+        setIsLoading(true);
+        
+        // 记录当前使用的nonce，便于调试
+        console.log(`NuggetCard - Using nonce: ${userState.player.nonce} for settle`);
+        
         const command = createCommand(BigInt(userState.player.nonce), SETTLE, []);
         dispatch(sendTransaction({
             cmd: command,
             prikey: l2account!.getPrivateKey()
-        }));
+        }))
+        .then((action) => {
+          if (sendTransaction.fulfilled.match(action)) {
+            console.log("NuggetCard - Settle successful:", action);
+            setIsLoading(false);
+            setTransactionComplete(true);
+            // After 2 seconds, hide transaction complete message
+            setTimeout(() => {
+              setTransactionComplete(false);
+            }, 2000);
+          } else {
+            console.error("NuggetCard - Settle failed:", action);
+            setIsLoading(false);
+          }
+        })
+        .catch(error => {
+          console.error("NuggetCard - Settle error:", error);
+          setIsLoading(false);
+        });
       }
     }
   };
@@ -192,8 +225,9 @@ export function NuggetCard(params: {index: number, amount: number, win: boolean}
         {!isSameRound && params.win && (
           <StyledButton 
             onClick={() => settle()} 
-            >
-            Win
+            disabled={isLoading}
+          >
+            {isLoading ? 'Processing...' : 'Win'}
           </StyledButton>
         )}
 

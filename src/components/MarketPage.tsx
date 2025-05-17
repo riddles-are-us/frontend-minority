@@ -7,6 +7,7 @@ import ChartPage from "../components/Chart";
 import TimeRunner from "../components/TimeRunner";
 import "./style.scss";
 import styled from 'styled-components';
+import { useTheme } from 'styled-components';
 
 // 创建一个标题容器
 const HeaderContainer = styled.div`
@@ -133,9 +134,8 @@ const GameTip = styled.div`
   }
 `;
 
-// 为Time left创建一个醒目的徽章
-const TimeBadge = styled.div<{ isLow: boolean }>`
-  background-color: ${props => props.isLow ? props.theme.error : props.theme.accent};
+// 为Time left创建一个醒目的徽章，根据时间范围显示不同效果
+const TimeBadge = styled.div<{ timeCategory: string }>`
   color: ${props => props.theme.textLight};
   font-weight: bold;
   font-size: 1.1rem;
@@ -144,11 +144,90 @@ const TimeBadge = styled.div<{ isLow: boolean }>`
   display: inline-flex;
   align-items: center;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-  border: 1px solid ${props => props.isLow ? props.theme.error : props.theme.accentDark};
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition: all 0.3s ease;
   
-  ${props => props.isLow && `
-    animation: pulseBg 1s infinite;
+  /* 根据时间范围设置不同的样式 */
+  /* 0-5秒: 紧急红色快速闪烁 */
+  ${props => props.timeCategory === 'critical' && `
+    background-color: ${props.theme.error};
+    border: 1px solid ${props.theme.error};
+    animation: criticalPulse 0.6s infinite;
+    box-shadow: 0 0 15px ${props.theme.error}80;
+    transform: scale(1.05);
+    
+    @keyframes criticalPulse {
+      0% { background-color: ${props.theme.error}; }
+      50% { background-color: rgba(220, 53, 69, 0.7); }
+      100% { background-color: ${props.theme.error}; }
+    }
+  `}
+  
+  /* 5-15秒: 危险红色闪烁 */
+  ${props => props.timeCategory === 'danger' && `
+    background-color: ${props.theme.error};
+    border: 1px solid ${props.theme.error};
+    animation: dangerPulse 0.8s infinite;
+    box-shadow: 0 0 10px ${props.theme.error}60;
+    
+    @keyframes dangerPulse {
+      0% { background-color: ${props.theme.error}; }
+      50% { background-color: rgba(220, 53, 69, 0.8); }
+      100% { background-color: ${props.theme.error}; }
+    }
+  `}
+  
+  /* 15-30秒: 警告橙色闪烁 */
+  ${props => props.timeCategory === 'warning' && `
+    background-color: #fd7e14;
+    border: 1px solid #fd7e14;
+    animation: warningPulse 1s infinite;
+    
+    @keyframes warningPulse {
+      0% { background-color: #fd7e14; }
+      50% { background-color: rgba(253, 126, 20, 0.8); }
+      100% { background-color: #fd7e14; }
+    }
+  `}
+  
+  /* 30-60秒: 注意黄色闪烁 */
+  ${props => props.timeCategory === 'attention' && `
+    background-color: #ffc107;
+    border: 1px solid #ffc107;
+    animation: attentionPulse 1.2s infinite;
+    
+    @keyframes attentionPulse {
+      0% { background-color: #ffc107; }
+      50% { background-color: rgba(255, 193, 7, 0.8); }
+      100% { background-color: #ffc107; }
+    }
+  `}
+  
+  /* 60-120秒: 信息蓝色渐变 */
+  ${props => props.timeCategory === 'info' && `
+    background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    border: 1px solid #0d6efd;
+    animation: infoPulse 3s infinite;
+    
+    @keyframes infoPulse {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    background-size: 200% 200%;
+  `}
+  
+  /* 120秒+: 安全绿色渐变 */
+  ${props => props.timeCategory === 'safe' && `
+    background: linear-gradient(45deg, #198754, #20c997);
+    border: 1px solid #198754;
+    animation: safePulse 5s infinite;
+    
+    @keyframes safePulse {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    background-size: 200% 200%;
   `}
   
   &::before {
@@ -156,12 +235,6 @@ const TimeBadge = styled.div<{ isLow: boolean }>`
     display: inline-block;
     margin-right: 0.5rem;
     font-size: 1.2rem;
-  }
-  
-  @keyframes pulseBg {
-    0% { background-color: ${props => props.theme.error}; }
-    50% { background-color: ${props => `rgba(220, 53, 69, 0.7)`}; }
-    100% { background-color: ${props => props.theme.error}; }
   }
   
   @media (max-width: 768px) {
@@ -201,13 +274,32 @@ const MarketInfo = styled.div`
 
 export const MarketPage = () => {
   const userState = useAppSelector(selectUserState);
+  const theme = useTheme();
 
-  useEffect(() => {
-  }, [userState]);
-
-  // 检查时间是否少于10秒
-  const timeLeft = userState?.state ? (userState.state.counter + 1) * 5 : 0;
-  const isTimeRunningLow = timeLeft < 10;
+  // 使用useMemo缓存计算结果，避免每次渲染都重新计算
+  const { timeLeft, timeCategory } = React.useMemo(() => {
+    const timeLeft = userState?.state ? (userState.state.counter + 1) * 5 : 0;
+    
+    // 根据时间范围确定类别
+    let timeCategory = 'safe'; // 默认安全状态
+    
+    if (timeLeft <= 5) {
+      timeCategory = 'critical'; // 0-5秒: 紧急红色快速闪烁
+    } else if (timeLeft <= 15) {
+      timeCategory = 'danger';   // 5-15秒: 危险红色闪烁
+    } else if (timeLeft <= 30) {
+      timeCategory = 'warning';  // 15-30秒: 警告橙色闪烁
+    } else if (timeLeft <= 60) {
+      timeCategory = 'attention'; // 30-60秒: 注意黄色闪烁
+    } else if (timeLeft <= 120) {
+      timeCategory = 'info';     // 60-120秒: 信息蓝色渐变
+    } // 否则保持为'safe' (120秒+: 安全绿色渐变)
+    
+    return {
+      timeLeft,
+      timeCategory
+    };
+  }, [userState?.state?.counter]);
 
   return (
     <>
@@ -224,7 +316,7 @@ export const MarketPage = () => {
             <RoundBadge>
               Current Round: {userState.state.round}
             </RoundBadge>
-            <TimeBadge isLow={isTimeRunningLow}>
+            <TimeBadge timeCategory={timeCategory}>
               Time left: <TimeValue>{Math.max(0, timeLeft-5)} - {timeLeft}</TimeValue> seconds
             </TimeBadge>
           </MarketInfo>

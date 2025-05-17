@@ -12,6 +12,8 @@ function App() {
   const l1account = useAppSelector(AccountSlice.selectL1Account);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const [isLoading, setIsLoading] = useState(true);
+  // 添加一个状态来跟踪钱包是否已连接但需要签名
+  const [walletConnected, setWalletConnected] = useState(false);
   
   // 在组件加载时尝试恢复会话
   useEffect(() => {
@@ -20,18 +22,14 @@ function App() {
     
     // 如果页面刷新但用户已经连接过钱包
     if (hasSavedWalletInfo && !l1account) {
-      // 初始化连接流程
+      // 只恢复L1账户连接，但不自动恢复L2账户
       dispatch(AccountSlice.loginL1AccountAsync())
         .then((action) => {
           if (AccountSlice.loginL1AccountAsync.fulfilled.match(action) && action.payload) {
-            // 如果已经获取到L1账户，尝试获取L2账户
-            dispatch(AccountSlice.loginL2AccountAsync("ZKWASM-BEAT"))
-              .finally(() => {
-                setIsLoading(false);
-              });
-          } else {
-            setIsLoading(false);
+            // 标记钱包已连接，但需要用户在登录页面签名
+            setWalletConnected(true);
           }
+          setIsLoading(false);
         })
         .catch(() => {
           setIsLoading(false);
@@ -45,6 +43,7 @@ function App() {
   useEffect(() => {
     if (l1account) {
       localStorage.setItem('wallet_connected', 'true');
+      setWalletConnected(true);
     }
   }, [l1account]);
   
@@ -68,7 +67,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <div className="screen">
-        {isFullyAuthenticated ? <Main /> : <ConnectPage />}
+        {isFullyAuthenticated ? (
+          <Main />
+        ) : (
+          <ConnectPage walletAlreadyConnected={walletConnected} />
+        )}
       </div>
     </ThemeProvider>
   );

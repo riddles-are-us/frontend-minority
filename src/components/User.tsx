@@ -334,26 +334,26 @@ export const User = () => {
 
   // 每次userState变化时记录库存状态
   useEffect(() => {
-    if (userState?.player?.data) {
+    // 只在userState和player数据存在时执行
+    if (!userState?.player?.data) return;
+
+    // 减少不必要的日志输出
+    if (process.env.NODE_ENV !== 'production') {
+      // 仅在开发环境输出日志
       if (hasInventoryData) {
         console.log('Inventory data available:', userState.player.data.purchase.length, 'items');
       } else {
         console.log('No inventory data available');
       }
-      const isSameRound = userState?.player?.data.round === userState?.state?.round;
-      if (!isSameRound) {
-        if (roundsInfo.has(userState!.player!.data.round)) {
-          const roundInfo = roundsInfo.get(userState!.player!.data.round)!;
-          console.log("roundinfo", roundInfo);
-        } else {
-          dispatch(getRound(userState!.player!.data.round));
-        }
-      }
     }
-    // 检查库存回合与当前回合是否一致
 
-
-  }, [userState, hasInventoryData, roundsInfo]);
+    // 只在回合不同时获取回合信息
+    const isSameRound = userState.player.data.round === userState?.state?.round;
+    if (!isSameRound && !roundsInfo.has(userState.player.data.round)) {
+      // 只在回合信息不存在时才请求
+      dispatch(getRound(userState.player.data.round));
+    }
+  }, [userState, hasInventoryData, roundsInfo, dispatch]);
 
 
   function isWinningCard(index: number) {

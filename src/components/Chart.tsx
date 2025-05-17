@@ -11,6 +11,7 @@ import Loader from './Loader';
 import { useTheme } from 'styled-components';
 import { BUY_CARD } from '../request';
 import styled from 'styled-components';
+import { store } from '../app/store';
 
 // Register required Chart.js components and plugins
 Chart.register(ArcElement, Tooltip, ChartDataLabels)
@@ -261,27 +262,6 @@ export default function MultilevelPieChart() {
     }
   }, [currentData]); // 只依赖于currentData
 
-  // Buy a card when a chart segment is clicked
-  const buyCard = useCallback((index: bigint, amount: bigint) => {
-    if(userState?.player) {
-      setIsLoading(true);
-      const command = createCommand(BigInt(userState.player.nonce), BUY_CARD, [index, amount]);
-      dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
-        .then((action) => {
-          if (sendTransaction.fulfilled.match(action)) {
-            setIsLoading(false);
-            setTransactionComplete(true);
-            // After 2 seconds, hide the transaction complete message
-            setTimeout(() => {
-              setTransactionComplete(false);
-            }, 2000);
-          } else {
-            setIsLoading(false);
-          }
-        });
-    }
-  }, [userState, l2account, dispatch]);
-
   // 更新图表数据 - 使用useMemo缓存数据，避免重复计算
   const memoizedChartData = useMemo(() => {
     if (!userState?.state?.cards) return null;
@@ -324,8 +304,19 @@ export default function MultilevelPieChart() {
     }
   }, [memoizedChartData, chartData]);
 
-  const handleChartClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
+  // 直接在handleChartClick中实现buyCard逻辑，确保每次都使用最新的nonce
+  const handleChartClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    // 移除useCallback，避免闭包捕获旧的userState
     if (!chartRef.current) return;
+    
+    // 重新获取最新的userState和l2account，确保使用最新的nonce
+    const currentUserState = store.getState().state.userState;
+    const currentL2Account = store.getState().account.l2account;
+    
+    if (!currentUserState?.player || !currentL2Account) {
+      console.error("Chart - Missing user state or l2account");
+      return;
+    }
     
     const chart = chartRef.current;
     const activePoints = chart.getElementsAtEventForMode(
@@ -338,10 +329,39 @@ export default function MultilevelPieChart() {
     if (activePoints.length > 0) {
       const index = activePoints[0].index;
       setActiveSegment(index);
-      buyCard(BigInt(index), 1n);
-      console.log(`Clicked on segment ${index}`);
+      
+      // 内联buyCard逻辑，确保使用最新的nonce
+      setIsLoading(true);
+      
+      // 直接从store获取最新的nonce，而不是依赖于组件的props或state
+      const latestNonce = currentUserState.player.nonce;
+      
+      // 记录当前使用的nonce，便于调试
+      console.log(`Chart - Using nonce: ${latestNonce} for index: ${index}`);
+      
+      const command = createCommand(BigInt(latestNonce), BUY_CARD, [BigInt(index), 1n]);
+      
+      dispatch(sendTransaction({cmd: command, prikey: currentL2Account.getPrivateKey()}))
+        .then((action) => {
+          if (sendTransaction.fulfilled.match(action)) {
+            console.log("Chart - Transaction successful:", action);
+            setIsLoading(false);
+            setTransactionComplete(true);
+            // After 2 seconds, hide the transaction complete message
+            setTimeout(() => {
+              setTransactionComplete(false);
+            }, 2000);
+          } else {
+            console.error("Chart - Transaction failed:", action);
+            setIsLoading(false);
+          }
+        })
+        .catch(error => {
+          console.error("Chart - Transaction error:", error);
+          setIsLoading(false);
+        });
     }
-  }, [buyCard]);
+  };
 
   // Options for the chart
   const options = useMemo(() => ({

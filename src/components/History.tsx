@@ -240,24 +240,39 @@ export const HistoryPage = () => {
   const claimReward = (index: bigint) => {
     if(userState?.player) {
         const roundKey = index.toString();
-        // Start loading
+        // 只设置一次loading状态
         setLoadingRounds(prev => ({...prev, [roundKey]: true}));
+        
+        // 记录当前使用的nonce，便于调试
+        console.log(`History - Using nonce: ${userState.player.nonce} for round: ${index}`);
         
         const command = createCommand(BigInt(userState.player.nonce), CLAIM_REWARD, [index]);
         dispatch(sendTransaction({cmd: command, prikey: l2account!.getPrivateKey()}))
         .then((action) => {
           if (sendTransaction.fulfilled.match(action)) {
-            // Mark as completed
+            // 记录成功的交易
+            console.log("History - Claim reward successful:", action);
+            
+            // 成功后直接设置完成状态，不需要单独更新loadingRounds
             setCompletedRounds(prev => ({...prev, [roundKey]: true}));
-            // After 2 seconds, reset states
+            
+            // 使用单个setTimeout重置所有状态
             setTimeout(() => {
+              // 批量更新状态，减少渲染次数
               setLoadingRounds(prev => ({...prev, [roundKey]: false}));
               setCompletedRounds(prev => ({...prev, [roundKey]: false}));
             }, 2000);
           } else {
-            // On failure, stop loading
+            // 记录失败的交易
+            console.error("History - Claim reward failed:", action);
+            
+            // 失败时只需要重置loading状态
             setLoadingRounds(prev => ({...prev, [roundKey]: false}));
           }
+        })
+        .catch(error => {
+          console.error("History - Claim reward error:", error);
+          setLoadingRounds(prev => ({...prev, [roundKey]: false}));
         });
     }
   }

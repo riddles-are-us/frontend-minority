@@ -247,7 +247,12 @@ const StyledLandingPage = styled.div`
   }
 `;
 
-const ConnectPage = () => {
+// 修改ConnectPage组件，添加walletAlreadyConnected属性
+interface ConnectPageProps {
+  walletAlreadyConnected?: boolean;
+}
+
+const ConnectPage = ({ walletAlreadyConnected = false }: ConnectPageProps) => {
   const l1account = useAppSelector(AccountSlice.selectL1Account);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const dispatch = useAppDispatch();
@@ -274,8 +279,11 @@ const ConnectPage = () => {
         
         <div className="buttons">
           {!l1account ? (
-            <button className="connect-btn" onClick={handleConnect}>
-              Connect Wallet
+            <button 
+              className="connect-btn" 
+              onClick={handleConnect}
+            >
+              {walletAlreadyConnected ? 'Reconnect Wallet' : 'Connect Wallet'}
             </button>
           ) : !l2account ? (
             <button className="login-btn" onClick={handleLogin}>

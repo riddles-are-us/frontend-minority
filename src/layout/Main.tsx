@@ -78,8 +78,6 @@ const InfoText = styled.p`
 `;
 
 const REGISTER_PLAYER = 1n;
-// 更新轮询间隔为3秒，减少卡顿
-const POLLING_INTERVAL = 3000;
 
 export function Main() {
   const connectState = useAppSelector(selectConnectState);
@@ -87,190 +85,77 @@ export function Main() {
   const lastError = useAppSelector(selectLastError);
   const l2account = useAppSelector(AccountSlice.selectL2Account);
   const dispatch = useAppDispatch();
-  const [timeLeft, setTimeLeft] = useState<number>(0);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isPollingRef = useRef<boolean>(false);
-  // 用于存储上一次请求的数据，避免重复渲染
-  const lastDataRef = useRef<any>(null);
-  // 跟踪上次更新时间，避免频繁更新
-  const lastUpdateTimeRef = useRef<number>(Date.now());
+  const [inc, setInc] = useState<number>(0);
   
-  // 统一的数据更新函数 - 添加优化逻辑
-  const updateAllData = useCallback(() => {
-    // 检查距离上次更新是否至少过了1秒
+  // 使用ref来跟踪上次请求的时间，防止重复请求
+  const lastRequestTimeRef = useRef<number>(0);
+  // 使用ref来跟踪是否有挂起的请求
+  const hasPendingRequestRef = useRef<boolean>(false);
+  // 轮询间隔时间
+  const POLL_INTERVAL = 3000; // 3 seconds
+  // 防止重复请求的最小间隔
+  const MIN_REQUEST_INTERVAL = 1000; // 1 second
+  
+  // 更新状态函数，使用useCallback以避免不必要的重渲染
+  const updateState = useCallback(() => {
     const now = Date.now();
-    if (now - lastUpdateTimeRef.current < 1000) {
-      console.log('Skipping update - too soon since last update');
-      return;
-    }
     
-    if (connectState === ConnectState.Idle && l2account) {
-      console.log('Unified polling - updating all data...');
+    // 避免频繁请求：确保距离上次请求至少间隔MIN_REQUEST_INTERVAL毫秒
+    // 并且确保没有挂起的请求
+    if (connectState >= ConnectState.Idle && l2account && 
+        !hasPendingRequestRef.current && 
+        now - lastRequestTimeRef.current > MIN_REQUEST_INTERVAL) {
       
-      // 使用强制刷新标志，确保后端返回所有数据
+      // 更新上次请求时间和挂起状态
+      lastRequestTimeRef.current = now;
+      hasPendingRequestRef.current = true;
+      
+      // 记录当前的用户状态，便于调试
+      if (userState?.player) {
+        console.log(`Main - Polling with nonce: ${userState.player.nonce}`);
+      }
+      
+      // 发起请求
       dispatch(queryState(l2account.getPrivateKey()))
         .then((action) => {
+          // 检查请求是否成功
           if (queryState.fulfilled.match(action)) {
-            // 检查返回的数据是否包含必要的字段
             const data = action.payload;
-            
-            // 只在数据真正变化时才记录和处理
-            if (!isEqual(data, lastDataRef.current)) {
-              lastDataRef.current = data;
-              lastUpdateTimeRef.current = Date.now();
-              
-              if (data && data.player && data.state) {
-                console.log('Data changed, updating UI');
-                console.log('- Round:', data.state.round);
-                console.log('- Counter:', data.state.counter);
-              } else {
-                console.warn('Data returned but may be incomplete');
-                // 如果关键数据缺失，再次尝试 - 使用防抖函数避免过多请求
-                setTimeout(() => {
-                  console.log('Retrying to get complete data...');
-                  dispatch(queryState(l2account.getPrivateKey()));
-                }, 1000);
-              }
-            } else {
-              console.log('Data unchanged, skipping update');
+            if (data?.player) {
+              console.log(`Main - Updated state, new nonce: ${data.player.nonce}`);
             }
-          } else {
-            console.warn('Failed to update data');
           }
+        })
+        .finally(() => {
+          // 请求完成后，设置挂起状态为false
+          hasPendingRequestRef.current = false;
         });
-    } else if (connectState === ConnectState.Init) {
-      console.log('Updating initial state...');
-      dispatch(queryInitialState("1"));
     }
-  }, [connectState, l2account, dispatch]);
-  
-  // 使用防抖版本的更新函数，减少过于频繁的调用
-  const debouncedUpdateAllData = useCallback(
-    debounce(updateAllData, 300),
-    [updateAllData]
-  );
-
-  // 处理交易完成后的数据刷新
-  const refreshAfterTransaction = useCallback(() => {
-    // 延迟确保服务器有时间处理交易
-    setTimeout(() => {
-      console.log('Refreshing data after transaction...');
-      updateAllData();
-    }, 500);
-  }, [updateAllData]);
-  
-  // 监听交易完成
-  useEffect(() => {
-    // 监听交易成功事件来刷新数据
-    const handleTransactionUpdate = () => {
-      refreshAfterTransaction();
-    };
     
-    // 这里可以添加监听交易事件的代码
-    // 例如订阅Redux状态的交易事件
-    
-    return () => {
-      // 移除事件监听器
-    };
-  }, [refreshAfterTransaction]);
-
-  // 监听userState变化，检查数据完整性 - 使用防抖减少频繁调用
-  useEffect(() => {
-    if (userState) {
-      // 检查数据是否完整
-      const hasInventory = userState.player && 
-                           userState.player.data && 
-                           Array.isArray(userState.player.data.purchase);
-                           
-      const hasRewards = userState.player && 
-                         userState.player.data && 
-                         Array.isArray(userState.player.data.rounds);
-      
-      if (!hasInventory || !hasRewards) {
-        console.warn('Incomplete user data detected, forcing refresh');
-        if (l2account) {
-          // 如果数据不完整，使用防抖函数重新请求
-          setTimeout(() => debouncedUpdateAllData(), 500);
-        }
-      }
-    }
-  }, [userState, l2account, debouncedUpdateAllData]);
-
-  // 处理计时器归零的情况 - 简化为仅调用数据更新函数
-  const handleTimerEnd = useCallback(() => {
-    console.log('Timer reached zero, refreshing all data...');
-    updateAllData();
-  }, [updateAllData]);
-
-  // 初始化 - 第一次加载组件时获取数据
+    // 更新计数器以触发下一次轮询
+    setInc(prevInc => prevInc + 1);
+  }, [connectState, l2account, dispatch, userState]);
+  
+  // 初始化获取数据，只在组件挂载时或状态变化时进行一次
   useEffect(() => {
     if (l2account && connectState === ConnectState.Init) {
       dispatch(queryState(l2account.getPrivateKey()));
-    } else {
+    } else if (connectState === ConnectState.Init) {
       dispatch(queryInitialState("1"));
     }
   }, [l2account, connectState, dispatch]);
-
-  // 当用户状态改变时更新时间显示 - 添加检测避免不必要更新
+  
+  // 设置轮询
   useEffect(() => {
-    if (userState?.state) {
-      const currentRound = userState.state.round;
-      const counter = userState.state.counter;
-      
-      // 计算新的倒计时时间
-      const newServerTimeLeft = (counter+1) * 5;
-      
-      // 只在时间真正改变时更新状态
-      if (newServerTimeLeft !== timeLeft) {
-        console.log('Time changed - Round:', currentRound, 'Counter:', counter);
-        // 直接更新显示的倒计时为服务器时间
-        setTimeLeft(newServerTimeLeft);
-      }
-      
-      // 如果时间为0或小于0，立即触发更新
-      if (newServerTimeLeft <= 0) {
-        console.log('Server time is zero or negative');
-        // 不再调用handleTimerEnd，避免重复请求
-      }
-    }
-  }, [userState, timeLeft]);
-
-  // 统一的轮询机制 - 使用更长间隔，减少不必要的更新
-  useEffect(() => {
-    // 清理任何现有的轮询
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-      isPollingRef.current = false;
-    }
+    const timeoutId = setTimeout(() => {
+      updateState();
+    }, POLL_INTERVAL);
     
-    // 只有在已连接并登录后才开始轮询
-    const shouldStartPolling = 
-      connectState === ConnectState.Idle && 
-      l2account;
-      
-    if (shouldStartPolling) {
-      console.log('Starting optimized polling - 3 second interval');
-      isPollingRef.current = true;
-      
-      // 立即进行一次完整更新
-      updateAllData();
-      
-      // 开始统一的轮询 - 使用优化后的间隔和防抖函数
-      pollingIntervalRef.current = setInterval(() => {
-        debouncedUpdateAllData();
-      }, POLLING_INTERVAL);
-    }
-    
-    // 清理函数
+    // 清理函数，确保在组件卸载时取消任何挂起的超时
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-        isPollingRef.current = false;
-      }
+      clearTimeout(timeoutId);
     };
-  }, [connectState, l2account, updateAllData, debouncedUpdateAllData]);
+  }, [inc, updateState]);
 
   // 安装玩家
   useEffect(() => {
